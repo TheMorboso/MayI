@@ -10,7 +10,7 @@ import { Colors } from '@/constants/Colors';
 
 export default function ConfigScreen() {
   const [jsonData, setJsonData] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(false); // Para la carga del JSON
   const [isJsonVisible, setIsJsonVisible] = useState(false);
   const textColor = useThemeColor({}, 'text');
   const colorScheme = useColorScheme();
@@ -48,7 +48,7 @@ export default function ConfigScreen() {
             const parsedJson = JSON.parse(existingTeamsJson);
             setJsonData(JSON.stringify(parsedJson, null, 2)); 
           } catch (parseError) {
-            setJsonData(existingTeamsJson);
+            setJsonData(existingTeamsJson); // Mostrar como texto si no es JSON válido
           }
         } else {
           setJsonData(`No hay datos guardados bajo la clave "${TEAMS_STORAGE_KEY}".`);
@@ -129,10 +129,11 @@ export default function ConfigScreen() {
         <ActivityIndicator size="large" style={styles.loader} />
       )}
       {isJsonVisible && !isLoading && jsonData !== null && (
-        <ScrollView style={styles.jsonContainer}>
+        <ScrollView style={[styles.jsonContainer, { borderColor: colorScheme === 'dark' ? '#555' : '#ccc'}]}>
           <ThemedText style={[styles.jsonText, { color: textColor }]}>{jsonData}</ThemedText>
         </ScrollView>
       ) }
+
     </ThemedView>
   );
 }
@@ -166,7 +167,7 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     fontSize: 16,
   },
-  loader: {
+  loader: { // Para el JSON
     marginTop: 20,
   },
   loaderSmall: {
@@ -174,15 +175,15 @@ const styles = StyleSheet.create({
   },
   jsonContainer: {
     width: '90%',
-    marginTop: 20,
+    marginTop: 10, // Reducido un poco el margen superior
+    marginBottom: 20, // Añadido margen inferior
     padding: 10,
     borderWidth: 1,
-    borderColor: '#ccc', // Considerar usar un color del tema aquí
+    // borderColor se establece dinámicamente ahora
     borderRadius: 5,
-    maxHeight: 300, // Altura máxima para el contenedor JSON
+    maxHeight: 300, 
   },
   jsonText: {
     fontSize: 14,
-    // El color se aplica dinámicamente
   },
 });
