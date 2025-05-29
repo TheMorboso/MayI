@@ -1,48 +1,134 @@
-import React, { useState } from 'react';
-import { StyleSheet, Button, ActivityIndicator, ScrollView } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { StyleSheet, Button, ActivityIndicator, ScrollView, TextInput, View, Alert, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { useThemeColor } from '@/hooks/useThemeColor';
+import { useColorScheme } from '@/hooks/useColorScheme';
+import { Colors } from '@/constants/Colors';
 
 export default function ConfigScreen() {
   const [jsonData, setJsonData] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isJsonVisible, setIsJsonVisible] = useState(false);
   const textColor = useThemeColor({}, 'text');
+  const colorScheme = useColorScheme();
 
-  const handleShowJsonData = async () => {
-    setIsLoading(true);
-    setJsonData(null); // Limpiar datos anteriores
-    try {
-      const existingTeamsJson = await AsyncStorage.getItem('myTeams');
-      if (existingTeamsJson !== null) {
-        // Intentar formatear el JSON para mejor legibilidad
-        try {
-          const parsedJson = JSON.parse(existingTeamsJson);
-          setJsonData(JSON.stringify(parsedJson, null, 2)); // El '2' es para la indentación
-        } catch (parseError) {
-          // Si no se puede parsear (ej. no es JSON válido), mostrar el string crudo
-          setJsonData(existingTeamsJson);
-        }
-      } else {
-        setJsonData('No hay datos guardados bajo la clave "myTeams".');
+  const [seasonInput, setSeasonInput] = useState('');
+  const [currentSeason, setCurrentSeason] = useState<string | null>(null);
+  const [isSavingSeason, setIsSavingSeason] = useState(false);
+
+  const SEASON_STORAGE_KEY = 'currentSeason';
+  const TEAMS_STORAGE_KEY = 'myTeams';
+
+  // Cargar la temporada guardada al iniciar
+  useEffect(() => {
+    const loadSavedSeason = async () => {
+      const savedSeason = await AsyncStorage.getItem(SEASON_STORAGE_KEY);
+      if (savedSeason) {
+        setCurrentSeason(savedSeason);
       }
+    };
+    loadSavedSeason();
+  }, []);
+
+  const handleToggleJsonData = async () => {
+    if (isJsonVisible) {
+      setIsJsonVisible(false);
+      // Opcional: podrías limpiar jsonData aquí si no quieres que se mantenga en memoria
+      // setJsonData(null);
+    } else {
+      setIsLoading(true);
+      setJsonData(null); 
+      try {
+        const existingTeamsJson = await AsyncStorage.getItem(TEAMS_STORAGE_KEY);
+        if (existingTeamsJson !== null) {
+          try {
+            const parsedJson = JSON.parse(existingTeamsJson);
+            setJsonData(JSON.stringify(parsedJson, null, 2)); 
+          } catch (parseError) {
+            setJsonData(existingTeamsJson);
+          }
+        } else {
+          setJsonData(`No hay datos guardados bajo la clave "${TEAMS_STORAGE_KEY}".`);
+        }
+      } catch (e) {
+        console.error('Error al cargar los datos JSON desde AsyncStorage:', e);
+        setJsonData('Error al cargar los datos.');
+      } finally {
+        setIsLoading(false);
+        setIsJsonVisible(true); // Mostrar la sección de JSON (incluso si hay error o no hay datos)
+      }
+    }
+  };
+
+  const handleSaveSeason = async () => {
+    if (!seasonInput.match(/^\d{4}$/)) {
+      Alert.alert('Error', 'Por favor, ingresa un año válido (4 dígitos).');
+      return;
+    }
+    setIsSavingSeason(true);
+    try {
+      await AsyncStorage.setItem(SEASON_STORAGE_KEY, seasonInput);
+      setCurrentSeason(seasonInput);
+      setSeasonInput(''); // Limpiar input
+      Alert.alert('Éxito', 'Temporada guardada correctamente.');
     } catch (e) {
-      console.error('Error al cargar los datos JSON desde AsyncStorage:', e);
-      setJsonData('Error al cargar los datos.');
+      console.error('Error al guardar la temporada:', e);
+      Alert.alert('Error', 'No se pudo guardar la temporada.');
     } finally {
-      setIsLoading(false);
+      setIsSavingSeason(false);
     }
   };
 
   return (
     <ThemedView style={styles.container}>
       <ThemedText type="title">Configuración</ThemedText>
-      <Button title="Mostrar JSON de Teams Guardados" onPress={handleShowJsonData} />
-      {isLoading ? (
+
+      <View style={styles.sectionContainer}>
+        <ThemedText type="subtitle" style={styles.sectionTitle}>Temporada</ThemedText>
+        {currentSeason && (
+          <ThemedText style={styles.infoText}>Temporada Actual Guardada: {currentSeason}</ThemedText>
+        )}
+        <TextInput
+          style={[
+            styles.input,
+            {
+              backgroundColor: colorScheme === 'dark' ? '#2C2C2E' : '#f0f0f0',
+              color: textColor,
+              borderColor: colorScheme === 'dark' ? '#555' : 'gray',
+            }
+          ]}
+          value={seasonInput}
+          onChangeText={setSeasonInput}
+          placeholder="YYYY (ej. 2024)"
+          placeholderTextColor={colorScheme === 'dark' ? Colors.dark.icon : Colors.light.icon}
+          keyboardType="numeric"
+          maxLength={4}
+        />
+        <Button 
+          title="Guardar Temporada" 
+          onPress={handleSaveSeason} 
+          disabled={isSavingSeason || !seasonInput.trim()}
+          color={Platform.OS === 'ios' ? Colors.light.tint : undefined} // Color para iOS, Android usa el por defecto del tema
+        />
+        {isSavingSeason && <ActivityIndicator size="small" style={styles.loaderSmall} />}
+      </View>
+
+      <View style={styles.sectionContainer}>
+        <ThemedText type="subtitle" style={styles.sectionTitle}>Datos de Equipos (JSON)</ThemedText>
+        <Button 
+          title={isJsonVisible ? "Ocultar JSON de Teams" : "Mostrar JSON de Teams Guardados"} 
+          onPress={handleToggleJsonData} 
+          color={Platform.OS === 'ios' ? Colors.light.tint : undefined}
+        />
+      </View>
+
+      {isJsonVisible && isLoading && (
         <ActivityIndicator size="large" style={styles.loader} />
-      ) : jsonData !== null && (
+      )}
+      {isJsonVisible && !isLoading && jsonData !== null && (
         <ScrollView style={styles.jsonContainer}>
           <ThemedText style={[styles.jsonText, { color: textColor }]}>{jsonData}</ThemedText>
         </ScrollView>
@@ -54,12 +140,37 @@ export default function ConfigScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center', // Centra el contenido verticalmente
-    alignItems: 'center',     // Mantiene el contenido centrado horizontalmente
+    // justifyContent: 'center', // Lo quitamos para que el contenido empiece desde arriba
+    alignItems: 'center',
     paddingHorizontal: 10,
+    paddingTop: 20, // Espacio arriba
+  },
+  sectionContainer: {
+    width: '90%',
+    marginBottom: 30, // Espacio entre secciones
+    alignItems: 'center', // Centrar contenido de la sección
+  },
+  sectionTitle: {
+    marginBottom: 10,
+  },
+  infoText: {
+    marginBottom: 10,
+    fontSize: 16,
+  },
+  input: {
+    height: 45,
+    borderWidth: 1,
+    marginBottom: 15,
+    paddingHorizontal: 10,
+    width: '80%', // Ancho del input
+    borderRadius: 5,
+    fontSize: 16,
   },
   loader: {
     marginTop: 20,
+  },
+  loaderSmall: {
+    marginTop: 10,
   },
   jsonContainer: {
     width: '90%',
@@ -68,7 +179,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#ccc', // Considerar usar un color del tema aquí
     borderRadius: 5,
-    maxHeight: '70%', // Para evitar que ocupe toda la pantalla si es muy largo
+    maxHeight: 300, // Altura máxima para el contenedor JSON
   },
   jsonText: {
     fontSize: 14,

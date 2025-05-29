@@ -7,7 +7,8 @@ import { ThemedView } from '@/components/ThemedView';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { Colors } from '@/constants/Colors';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { IconSymbol } from '@/components/ui/IconSymbol'; // Necesario para el botón del header
+import { scrapeWorldFootballTeamData, ScrapedTeamInfo } from '../../api/scraper'; // Actualizado para la nueva función y tipo
+import { IconSymbol } from '@/components/ui/IconSymbol';
 
 export default function TeamsScreen() {
   const [modalVisible, setModalVisible] = useState(false);
@@ -37,26 +38,46 @@ export default function TeamsScreen() {
   }, [navigation]);
 
   const handleAddItem = async () => {
-    if (inputText.trim()) {
-      const newTeam = inputText.trim();
+    const teamUrl = inputText.trim();
+    if (teamUrl) {
       try {
+        // Podrías añadir un indicador de carga aquí
+        console.log(`Iniciando scraping para: ${teamUrl}`);
+        const scrapedData = await scrapeWorldFootballTeamData(teamUrl);
+
+        if (scrapedData.error) {
+          console.error('Error de scraping:', scrapedData.error);
+          // Aquí podrías mostrar un Alert al usuario con scrapedData.error
+          // Por ahora, no guardaremos si hay un error de scraping.
+          // O podrías decidir guardar la URL con el mensaje de error.
+          setInputText(''); // Limpiar input incluso si hay error
+          setModalVisible(false);
+          return;
+        }
+
         // 1. Obtener los teams existentes
         const existingTeamsJson = await AsyncStorage.getItem('myTeams');
-        let teamsArray = existingTeamsJson ? JSON.parse(existingTeamsJson) : [];
+        let teamsArray: ScrapedTeamInfo[] = existingTeamsJson ? JSON.parse(existingTeamsJson) : [];
 
-        // 2. Agregar el nuevo team
-        teamsArray.push(newTeam);
+        // Opcional: Verificar si ya existe un team con la misma URL para evitar duplicados
+        const existingIndex = teamsArray.findIndex(team => team.originalUrl === scrapedData.originalUrl);
+        if (existingIndex > -1) {
+          console.log(`El team con URL ${scrapedData.originalUrl} ya existe. Actualizando...`);
+          teamsArray[existingIndex] = scrapedData; // Actualizar el existente
+        } else {
+          teamsArray.push(scrapedData);
+        }
 
-        // 3. Guardar el array actualizado
+        // 2. Guardar el array actualizado
         await AsyncStorage.setItem('myTeams', JSON.stringify(teamsArray));
 
-        console.log('Team agregado y guardado:', newTeam);
-        console.log('Todos los teams:', teamsArray);
+        console.log('Datos del team scrapeados y guardados:', scrapedData);
+        console.log('Todos los teams guardados:', teamsArray);
 
         setInputText('');
         setModalVisible(false);
       } catch (e) {
-        console.error('Error al guardar el team en AsyncStorage:', e);
+        console.error('Error en handleAddItem (posiblemente al interactuar con AsyncStorage):', e);
         // Aquí podrías mostrar un mensaje de error al usuario
       }
     } else {
@@ -94,8 +115,9 @@ export default function TeamsScreen() {
               ]}
               onChangeText={setInputText}
               value={inputText}
-              placeholder="Nombre del Team..."
+              placeholder="Ingresa URL de worldfootball.net..."
               placeholderTextColor={colorScheme === 'dark' ? Colors.dark.icon : Colors.light.icon}
+              keyboardType="url"
             />
             <View style={styles.buttonContainer}>
               <Button
