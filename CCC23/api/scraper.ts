@@ -201,39 +201,39 @@ export async function scrapeWorldFootballTeamMatches(
       return resultPayload;
     }
 
-    matchTable.find('tbody tr').each((i, row) => {
+    matchTable.find('tbody tr').each((rowIndex, row) => {
       const cells = $(row).find('td');
 
       // Asegurarse de que haya suficientes celdas para los selectores proporcionados.
       // El selector más alto es td:nth-child(7), que corresponde a cells.eq(6).
       if (cells.length < 7) {
-        console.warn(`Fila ${i} en ${fixturesUrl} tiene ${cells.length} celdas, se esperaban al menos 7. Saltando fila.`);
+        console.warn(`Fila ${rowIndex} en ${fixturesUrl} tiene ${cells.length} celdas, se esperaban al menos 7. Saltando fila.`);
         return; // Saltar esta fila si no tiene suficientes celdas
       }
 
       // Extracción directa basada en los selectores proporcionados:
       // td:nth-child(X) corresponde a cells.eq(X-1)
 
-      // Round: de td:nth-child(1) > a
+      // Round: selector #... > td:nth-child(1) > a
       const roundElement = cells.eq(0); // td:nth-child(1)
       const round = roundElement.find('a').text().trim() || roundElement.text().trim() || null;
 
-      // Fecha: de td:nth-child(1) > a (según tu selector, igual que Round)
+      // Fecha: selector #... > td:nth-child(1) > a
       const dateElement = cells.eq(0); // td:nth-child(1)
       const date = dateElement.find('a').text().trim() || dateElement.text().trim() || null;
       // Si la fecha y la ronda están en el mismo texto, es posible que necesites procesar esta cadena más adelante.
 
-      // Hora: de td:nth-child(3)
+      // Hora: selector #... > td:nth-child(3)
       const time = cells.eq(2).text().trim() || null; // td:nth-child(3)
 
-      // Lugar (se extrae el nombre del equipo local): de td:nth-child(4)
+      // Lugar (se extrae el nombre del equipo local): selector #... > td:nth-child(4)
       const homeTeamRaw = cells.eq(3).text().trim(); // td:nth-child(4)
 
-      // Equipo contrario: de td:nth-child(6) > a
+      // Equipo contrario: selector #... > td:nth-child(6) > a
       const awayTeamCell = cells.eq(5); // td:nth-child(6)
       const awayTeamRaw = awayTeamCell.find('a').text().trim() || awayTeamCell.text().trim();
 
-      // Resultado: de td:nth-child(7) > a
+      // Resultado: selector #... > td:nth-child(7) > a
       const resultCell = cells.eq(6); // td:nth-child(7)
       const resultText = resultCell.find('a').text().trim() || resultCell.text().trim() || null;
       
