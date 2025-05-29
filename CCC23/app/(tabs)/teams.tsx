@@ -6,6 +6,7 @@ import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { Colors } from '@/constants/Colors';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { IconSymbol } from '@/components/ui/IconSymbol'; // Necesario para el botón del header
 
 export default function TeamsScreen() {
@@ -35,14 +36,30 @@ export default function TeamsScreen() {
     });
   }, [navigation]);
 
-  const handleAddItem = () => {
+  const handleAddItem = async () => {
     if (inputText.trim()) {
-      console.log('Team a agregar:', inputText);
-      // Aquí puedes agregar la lógica para manejar el nuevo team
-      setInputText('');
-      setModalVisible(false);
+      const newTeam = inputText.trim();
+      try {
+        // 1. Obtener los teams existentes
+        const existingTeamsJson = await AsyncStorage.getItem('myTeams');
+        let teamsArray = existingTeamsJson ? JSON.parse(existingTeamsJson) : [];
+
+        // 2. Agregar el nuevo team
+        teamsArray.push(newTeam);
+
+        // 3. Guardar el array actualizado
+        await AsyncStorage.setItem('myTeams', JSON.stringify(teamsArray));
+
+        console.log('Team agregado y guardado:', newTeam);
+        console.log('Todos los teams:', teamsArray);
+
+        setInputText('');
+        setModalVisible(false);
+      } catch (e) {
+        console.error('Error al guardar el team en AsyncStorage:', e);
+        // Aquí podrías mostrar un mensaje de error al usuario
+      }
     } else {
-      // Opcional: manejar input vacío
       console.log('Input vacío, no se agrega team.');
     }
   };
