@@ -201,29 +201,42 @@ export async function scrapeWorldFootballTeamMatches(
       return resultPayload;
     }
 
-    const headerCells = matchTable.find('thead tr th');
-    const hasTimeColumn = headerCells.filter((i, el) => $(el).text().trim().toLowerCase() === 'time').length > 0;
-
-    const colIdx = {
-      round: 0,
-      date: 1,
-      time: hasTimeColumn ? 2 : -1,
-      homeTeam: hasTimeColumn ? 3 : 2,
-      awayTeam: hasTimeColumn ? 5 : 4,
-      result: hasTimeColumn ? 6 : 5,
-    };
-
     matchTable.find('tbody tr').each((i, row) => {
       const cells = $(row).find('td');
-      if (cells.length < (hasTimeColumn ? 7 : 6)) return;
 
-      const round = cells.eq(colIdx.round).text().trim() || null;
-      const date = cells.eq(colIdx.date).text().trim() || null;
-      const time = hasTimeColumn ? (cells.eq(colIdx.time).text().trim() || null) : null;
-      const homeTeamRaw = cells.eq(colIdx.homeTeam).text().trim();
-      const awayTeamRaw = cells.eq(colIdx.awayTeam).text().trim();
-      const resultText = cells.eq(colIdx.result).text().trim() || null;
+      // Asegurarse de que haya suficientes celdas para los selectores proporcionados.
+      // El selector más alto es td:nth-child(7), que corresponde a cells.eq(6).
+      if (cells.length < 7) {
+        console.warn(`Fila ${i} en ${fixturesUrl} tiene ${cells.length} celdas, se esperaban al menos 7. Saltando fila.`);
+        return; // Saltar esta fila si no tiene suficientes celdas
+      }
 
+      // Extracción directa basada en los selectores proporcionados:
+      // td:nth-child(X) corresponde a cells.eq(X-1)
+
+      // Round: de td:nth-child(1) > a
+      const roundElement = cells.eq(0); // td:nth-child(1)
+      const round = roundElement.find('a').text().trim() || roundElement.text().trim() || null;
+
+      // Fecha: de td:nth-child(1) > a (según tu selector, igual que Round)
+      const dateElement = cells.eq(0); // td:nth-child(1)
+      const date = dateElement.find('a').text().trim() || dateElement.text().trim() || null;
+      // Si la fecha y la ronda están en el mismo texto, es posible que necesites procesar esta cadena más adelante.
+
+      // Hora: de td:nth-child(3)
+      const time = cells.eq(2).text().trim() || null; // td:nth-child(3)
+
+      // Lugar (se extrae el nombre del equipo local): de td:nth-child(4)
+      const homeTeamRaw = cells.eq(3).text().trim(); // td:nth-child(4)
+
+      // Equipo contrario: de td:nth-child(6) > a
+      const awayTeamCell = cells.eq(5); // td:nth-child(6)
+      const awayTeamRaw = awayTeamCell.find('a').text().trim() || awayTeamCell.text().trim();
+
+      // Resultado: de td:nth-child(7) > a
+      const resultCell = cells.eq(6); // td:nth-child(7)
+      const resultText = resultCell.find('a').text().trim() || resultCell.text().trim() || null;
+      
       let opponent: string | null = null;
       let venue: 'H' | 'A' | 'N' | null = null;
 
