@@ -15,7 +15,7 @@ export default function TabLayout() {
     <Tabs
       screenOptions={{
         tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
-        headerShown: false,
+        // headerShown: false, // Lo quitamos para controlar por pantalla
         tabBarButton: HapticTab,
         tabBarBackground: TabBarBackground,
         tabBarStyle: Platform.select({
@@ -29,6 +29,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="matches"
         options={{
+          headerShown: true, // Mostrar el header para esta pestaña
           title: 'Matches',
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
         }}

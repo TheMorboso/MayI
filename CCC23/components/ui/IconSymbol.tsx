@@ -20,6 +20,7 @@ const MAPPING = {
   'chevron.right': 'chevron-right',
   'gearshape.fill': 'settings', // Mapeo para el ícono de configuración
   'plus': 'add', // Mapeo para el ícono de más
+  'doc.text.magnifyingglass': 'find_in_page', // Ícono para ver JSON
 } as IconMapping;
 
 /**
