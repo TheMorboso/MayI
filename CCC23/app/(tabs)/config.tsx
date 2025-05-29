@@ -1,52 +1,52 @@
-import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, Button, FlatList, Text, ActivityIndicator } from 'react-native';
+import React, { useState } from 'react';
+import { StyleSheet, Button, ActivityIndicator, ScrollView } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useIsFocused } from '@react-navigation/native';
 
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
+import { useThemeColor } from '@/hooks/useThemeColor';
 
 export default function ConfigScreen() {
-  const [teams, setTeams] = useState<string[]>([]);
-  const [loading, setLoading] = useState(false);
-  const isFocused = useIsFocused(); // Hook para saber si la pantalla está enfocada
+  const [jsonData, setJsonData] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const textColor = useThemeColor({}, 'text');
 
-  const loadTeams = async () => {
-    setLoading(true);
+  const handleShowJsonData = async () => {
+    setIsLoading(true);
+    setJsonData(null); // Limpiar datos anteriores
     try {
       const existingTeamsJson = await AsyncStorage.getItem('myTeams');
-      const teamsArray = existingTeamsJson ? JSON.parse(existingTeamsJson) : [];
-      setTeams(teamsArray);
+      if (existingTeamsJson !== null) {
+        // Intentar formatear el JSON para mejor legibilidad
+        try {
+          const parsedJson = JSON.parse(existingTeamsJson);
+          setJsonData(JSON.stringify(parsedJson, null, 2)); // El '2' es para la indentación
+        } catch (parseError) {
+          // Si no se puede parsear (ej. no es JSON válido), mostrar el string crudo
+          setJsonData(existingTeamsJson);
+        }
+      } else {
+        setJsonData('No hay datos guardados bajo la clave "myTeams".');
+      }
     } catch (e) {
-      console.error('Error al cargar los teams desde AsyncStorage:', e);
-      setTeams([]); // Asegurarse de que teams sea un array vacío en caso de error
+      console.error('Error al cargar los datos JSON desde AsyncStorage:', e);
+      setJsonData('Error al cargar los datos.');
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
-
-  useEffect(() => {
-    if (isFocused) { // Cargar datos solo cuando la pantalla está enfocada
-      loadTeams();
-    }
-  }, [isFocused]); // Recargar cuando la pantalla vuelve a estar enfocada
 
   return (
     <ThemedView style={styles.container}>
       <ThemedText type="title">Configuración</ThemedText>
-      <Button title="Recargar Teams Guardados" onPress={loadTeams} />
-      {loading ? (
+      <Button title="Mostrar JSON de Teams Guardados" onPress={handleShowJsonData} />
+      {isLoading ? (
         <ActivityIndicator size="large" style={styles.loader} />
-      ) : teams.length > 0 ? (
-        <FlatList
-          data={teams}
-          keyExtractor={(item, index) => `${item}-${index}`}
-          renderItem={({ item }) => <ThemedText style={styles.teamItem}>{item}</ThemedText>}
-          style={styles.list}
-        />
-      ) : (
-        <ThemedText style={styles.noTeamsText}>No hay teams guardados.</ThemedText>
-      )}
+      ) : jsonData !== null && (
+        <ScrollView style={styles.jsonContainer}>
+          <ThemedText style={[styles.jsonText, { color: textColor }]}>{jsonData}</ThemedText>
+        </ScrollView>
+      ) }
     </ThemedView>
   );
 }
@@ -56,23 +56,22 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     paddingTop: 20,
+    paddingHorizontal: 10,
   },
   loader: {
     marginTop: 20,
   },
-  list: {
+  jsonContainer: {
     width: '90%',
     marginTop: 20,
-  },
-  teamItem: {
     padding: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#ccc', // Considerar usar un color del tema aquí
-    fontSize: 18,
+    borderWidth: 1,
+    borderColor: '#ccc', // Considerar usar un color del tema aquí
+    borderRadius: 5,
+    maxHeight: '70%', // Para evitar que ocupe toda la pantalla si es muy largo
   },
-  noTeamsText: {
-    marginTop: 20,
-    fontSize: 16,
-    color: '#666', // Considerar usar un color del tema aquí
+  jsonText: {
+    fontSize: 14,
+    // El color se aplica dinámicamente
   },
 });
