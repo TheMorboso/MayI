@@ -54,8 +54,8 @@ export default function ConfigScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    alignItems: 'center',
-    paddingTop: 20,
+    justifyContent: 'center', // Centra el contenido verticalmente
+    alignItems: 'center',     // Mantiene el contenido centrado horizontalmente
     paddingHorizontal: 10,
   },
   loader: {
