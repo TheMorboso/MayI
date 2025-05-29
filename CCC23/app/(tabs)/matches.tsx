@@ -12,6 +12,7 @@ export default function MatchesScreen() {
   const [matchDetails, setMatchDetails] = useState<MatchDetails | null>(null);
 
   const TEAMS_STORAGE_KEY = 'myTeams';
+  const SEASON_STORAGE_KEY = 'currentSeason'; // Clave para la temporada guardada
 
   const handleFetchMatchDetails = async () => {
     setIsLoading(true);
@@ -32,7 +33,19 @@ export default function MatchesScreen() {
         return;
       }
 
-      const targetUrl = teams[0].originalUrl;
+      let targetUrl = teams[0].originalUrl;
+
+      // Intentar obtener la temporada guardada y modificar la URL
+      const savedSeason = await AsyncStorage.getItem(SEASON_STORAGE_KEY);
+      if (savedSeason) {
+        // Reemplazar el año en la URL con la temporada guardada
+        // Asume una estructura como /teams/team-name/YYYY/number/
+        const updatedUrl = targetUrl.replace(/(\/teams\/[^\/]+\/)\d{4}(\/\d+\/?)/, `$1${savedSeason}$2`);
+        if (updatedUrl !== targetUrl) {
+          console.log(`URL original: ${targetUrl}, Temporada guardada: ${savedSeason}, URL actualizada: ${updatedUrl}`);
+          targetUrl = updatedUrl;
+        }
+      }
 
       let fullUrl = targetUrl;
       if (!targetUrl.startsWith('http://') && !targetUrl.startsWith('https://')) {
@@ -40,7 +53,6 @@ export default function MatchesScreen() {
       }
 
       const scrapedData = await scrapeMatchDetails(fullUrl);
-
       console.log('Detalles del Partido Obtenidos:', scrapedData);
       setMatchDetails(scrapedData);
 
@@ -70,6 +82,7 @@ export default function MatchesScreen() {
             ) : (
               <>
                 <ThemedText style={styles.detailItem}>URL: {matchDetails.sourceUrl}</ThemedText>
+                <ThemedText style={styles.detailItem}>Jornada: {matchDetails.week || 'No disponible'}</ThemedText>
                 <ThemedText style={styles.detailItem}>Fecha: {matchDetails.fecha || 'No disponible'}</ThemedText>
                 <ThemedText style={styles.detailItem}>Hora: {matchDetails.hora || 'No disponible'}</ThemedText>
                 <ThemedText style={styles.detailItem}>Lugar: {matchDetails.lugar || 'No disponible'}</ThemedText>
