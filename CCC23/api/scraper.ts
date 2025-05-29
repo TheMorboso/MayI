@@ -119,20 +119,60 @@ export async function scrapeWorldFootballTeamMatches(
 ): Promise<TeamMatchesData> {
   const { originalUrl, teamName, teamEmblemSrc } = teamInfo;
   // Usar el teamName del ScrapedTeamInfo, que debería ser el nombre principal del equipo.
+  const configuredSeason = season;
   const ownTeamPrimaryName = teamName; 
 
-  const baseTeamUrl = originalUrl.endsWith('/') ? originalUrl : `${originalUrl}/`;
-  const fixturesUrl = `${baseTeamUrl}${season}/2/`; // Standard path for fixtures
+  let finalBaseTeamUrl: string;
+
+  // Regex to extract the true base team URL (e.g., https://www.worldfootball.net/teams/real-madrid/)
+  // from potentially longer URLs like .../real-madrid/2024/2/ or .../real-madrid/some-other-path/
+  const teamBaseUrlPattern = /^(https?:\/\/www\.worldfootball\.net\/teams\/[^/]+\/?)/;
+  const match = originalUrl.match(teamBaseUrlPattern);
+
+  if (match && match[1]) {
+    finalBaseTeamUrl = match[1];
+    if (!finalBaseTeamUrl.endsWith('/')) {
+      finalBaseTeamUrl += '/';
+    }
+  } else {
+    // This case should ideally not happen if originalUrl is a valid team page from worldfootball.net
+    console.warn(`Could not extract a clean base team URL from ${originalUrl}. Using it directly, which might lead to incorrect fixture URL construction.`);
+    finalBaseTeamUrl = originalUrl.endsWith('/') ? originalUrl : `${originalUrl}/`;
+  }
+
+  let fixturesUrl: string;
+  const pathAfterBase = originalUrl.substring(finalBaseTeamUrl.length); // Ej: "2025/3/" o "overview/" o ""
+
+  // Intenta encontrar un patrón como "YYYY/ALGO_MAS" en la parte de la ruta después de la URL base del equipo.
+  // El objetivo es reemplazar YYYY con configuredSeason y mantener /ALGO_MAS.
+  const yearAndRestPattern = /^(\d{4})\/(.+)/; 
+  const pathMatch = pathAfterBase.match(yearAndRestPattern);
+
+  if (pathMatch && pathMatch[1] && pathMatch[2]) {
+    // originalUrl tiene una estructura como /YYYY/NUMERO/ o /YYYY/OTRACOSA/ después de la base.
+    // pathMatch[1] es el año original (ej. "2025")
+    // pathMatch[2] es el resto de la ruta después del año original (ej. "3/" o "stats/")
+    const restOfThePath = pathMatch[2];
+    fixturesUrl = `${finalBaseTeamUrl}${configuredSeason}/${restOfThePath}`;
+    console.log(`Original URL path "${pathAfterBase}" matched. Constructed fixtures URL: ${fixturesUrl}`);
+  } else {
+    // originalUrl no tiene el patrón /YYYY/ALGO_MAS/ después de la base,
+    // o la parte después de la base está vacía.
+    // Usamos el comportamiento por defecto de agregar configuredSeason/2/.
+    fixturesUrl = `${finalBaseTeamUrl}${configuredSeason}/2/`;
+    console.log(`Original URL path "${pathAfterBase}" did not match /YYYY/ALGO_MAS/ pattern or was empty. Defaulting fixtures URL to: ${fixturesUrl}`);
+  }
+  
 
   const resultPayload: TeamMatchesData = {
     teamDetails: { originalUrl, name: teamName, emblemSrc: teamEmblemSrc },
-    season,
+    season: configuredSeason, // Usar la temporada configurada aquí también
     matches: [],
     fixturesUrl,
   };
 
   try {
-    console.log(`Scraping matches for ${teamName || originalUrl} season ${season} from ${fixturesUrl}`);
+    console.log(`Scraping matches for ${teamName || originalUrl} season ${configuredSeason} from ${fixturesUrl}`);
     const response = await fetch(fixturesUrl, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
@@ -148,28 +188,17 @@ export async function scrapeWorldFootballTeamMatches(
     const htmlText = await response.text();
     const $ = cheerio.load(htmlText);
 
-    const tables = $('table.standard_tabelle');
-    let matchTable = null;
-    tables.each((i, table) => {
-      const ths = $(table).find('thead tr th');
-      if (ths.length >= 5) {
-        const headerTexts = ths.map((j, th) => $(th).text().trim().toLowerCase()).get();
-        if (headerTexts.includes('home') && headerTexts.includes('away') && headerTexts.includes('result')) {
-          matchTable = $(table);
-          return false; 
-        }
-      }
-    });
+    // Nuevo selector proporcionado por el usuario
+    const matchTableSelector = '#site > div.white > div.content > div.portfolio > div.box > div > table';
+    const matchTable = $(matchTableSelector).first(); // Tomamos el primer elemento que coincida
 
-    if (!matchTable) {
-      if (tables.length > 0 && tables.first().find('tbody tr td').length > 0) {
-        console.warn(`No se identificó tabla de partidos por cabeceras para ${fixturesUrl}. Usando la primera 'table.standard_tabelle' con datos.`);
-        matchTable = tables.first();
-      } else {
-        resultPayload.error = "Tabla de partidos no encontrada o vacía.";
-        console.warn(`${resultPayload.error} en ${fixturesUrl}`);
-        return resultPayload;
-      }
+    // Verificar si la tabla fue encontrada con el nuevo selector
+    if (!matchTable || matchTable.length === 0) {
+      resultPayload.error = `Tabla de partidos no encontrada con el selector: ${matchTableSelector.substring(0,50)}...`;
+      console.warn(`${resultPayload.error} en ${fixturesUrl}`);
+      // Podrías intentar un fallback aquí si lo deseas, o simplemente retornar el error.
+      // Por ahora, si el selector específico no funciona, retornamos.
+      return resultPayload;
     }
 
     const headerCells = matchTable.find('thead tr th');
@@ -228,7 +257,7 @@ export async function scrapeWorldFootballTeamMatches(
       }
     });
   } catch (error: any) {
-    console.error(`Error al scrapear partidos para ${teamName} (${originalUrl}) temp ${season}:`, error);
+    console.error(`Error al scrapear partidos para ${teamName} (${originalUrl}) temp ${configuredSeason}:`, error);
     resultPayload.error = error.message || 'Error desconocido durante scrapeo de partidos.';
   }
   return resultPayload;
