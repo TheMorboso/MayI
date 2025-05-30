@@ -1,22 +1,27 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, Button, Platform, ActivityIndicator, Alert, ScrollView, Modal, TouchableOpacity } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@react-native-async-storage/async-storage'; // eslint-disable-line @typescript-eslint/no-unused-vars
 import { useNavigation } from 'expo-router';
 
 import { ThemedView } from '@/components/ThemedView';
 import { ThemedText } from '@/components/ThemedText';
 import { ScrapedTeamInfo } from '../../api/scraper'; 
 import { scrapeMatchDetails, MatchDetails } from '../../api/matchScraper'; // Importar la nueva función y tipo
+import { organizeMatchData, OrganizedMatchInfo } from '../../api/organizador'; // Importar el organizador
 import { IconSymbol } from '@/components/ui/IconSymbol'; // Para el ícono del header
 import { useColorScheme } from '@/hooks/useColorScheme'; // Para colores del modal
+import { useIsFocused } from '@react-navigation/native'; // Para detectar foco en la pantalla
 import { Colors } from '@/constants/Colors'; // Para colores del modal
 
 export default function MatchesScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [matchesData, setMatchesData] = useState<MatchDetails[] | null>(null);
+  const [organizedData, setOrganizedData] = useState<OrganizedMatchInfo[] | null>(null);
   const [isJsonModalVisible, setIsJsonModalVisible] = useState(false);
+  const [jsonToShow, setJsonToShow] = useState<'original' | 'organized' | null>(null);
   const navigation = useNavigation();
   const colorScheme = useColorScheme();
+  const isFocused = useIsFocused();
 
   const TEAMS_STORAGE_KEY = 'myTeams';
   const SEASON_STORAGE_KEY = 'currentSeason'; // Clave para la temporada guardada
@@ -27,6 +32,7 @@ export default function MatchesScreen() {
         <TouchableOpacity
           onPress={() => {
             if (matchesData) {
+              setJsonToShow('original'); // Por defecto, el ícono del header muestra el original
               setIsJsonModalVisible(true);
             } else {
               Alert.alert("Sin datos", "Primero realiza el scrapeo de partidos para ver el JSON.");
@@ -39,11 +45,23 @@ export default function MatchesScreen() {
         </TouchableOpacity>
       ),
     });
-  }, [navigation, matchesData, isLoading, colorScheme]);
+  }, [navigation, matchesData, isLoading, colorScheme]); // No es necesario jsonToShow aquí
+
+  useEffect(() => {
+    // Realizar el scrapeo automáticamente si la pantalla está enfocada,
+    // no hay datos cargados y no se está cargando actualmente.
+    if (isFocused && !matchesData && !isLoading) {
+      console.log("MatchesScreen focused and no data, initiating automatic scrape.");
+      setOrganizedData(null); // Limpiar datos organizados si se vuelve a scrapear
+      handleFetchMatchDetails();
+    }
+    // No incluir handleFetchMatchDetails en las dependencias para evitar bucles si la función no está memoizada.
+  }, [isFocused, matchesData, isLoading]); 
 
   const handleFetchMatchDetails = async () => {
     setIsLoading(true);
     setMatchesData(null);
+    setOrganizedData(null); // Limpiar datos organizados al iniciar nuevo scrapeo
 
     try {
       const teamsJson = await AsyncStorage.getItem(TEAMS_STORAGE_KEY);
@@ -103,14 +121,43 @@ export default function MatchesScreen() {
     }
   };
 
+  const handleOrganizeData = () => {
+    if (!matchesData) {
+      Alert.alert("Sin Datos", "No hay datos de partidos para organizar. Realiza el scrapeo primero.");
+      return;
+    }
+    console.log("Iniciando proceso de organización de datos...");
+    setIsLoading(true); // Podrías tener un loader específico para la organización
+    try {
+      const processedData = organizeMatchData(matchesData);
+      setOrganizedData(processedData);
+      Alert.alert("Éxito", "Los datos de los partidos han sido organizados.");
+    } catch (error: any) {
+      console.error("Error al organizar los datos:", error);
+      Alert.alert("Error de Organización", error.message || "Ocurrió un error al organizar los datos.");
+      setOrganizedData(null);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const openModalWithOrganizedData = () => {
+    if (organizedData) {
+      setJsonToShow('organized');
+      setIsJsonModalVisible(true);
+    } else {
+      Alert.alert("Sin Datos Organizados", "Primero organiza los datos usando el botón 'Procesar Partidos'.");
+    }
+  };
+
   return (
     <ThemedView style={styles.container}>
       <ThemedText type="title" style={styles.screenTitle}>Matches</ThemedText>
       <View style={styles.content}>
         <Button
-          title="Matches"
-          onPress={handleFetchMatchDetails}
-          disabled={isLoading}
+          title="Procesar Partidos" // Cambiado el título del botón
+          onPress={handleOrganizeData}
+          disabled={isLoading || !matchesData} // Deshabilitado si está cargando o si no hay datos originales
         />
         {isLoading && <ActivityIndicator size="large" style={styles.loader} />}
         {!isLoading && matchesData && (
@@ -127,6 +174,15 @@ export default function MatchesScreen() {
             }
           </ThemedText>
         )}
+        {organizedData && !isLoading && (
+          <View style={styles.buttonSpacing}>
+            <Button
+              title="Ver Organizado"
+              onPress={openModalWithOrganizedData}
+              color={Platform.OS === 'ios' ? Colors.light.tint : Colors.dark.tint} // Un color diferente para distinguirlo
+            />
+          </View>
+        )}
       </View>
 
       <Modal
@@ -134,6 +190,7 @@ export default function MatchesScreen() {
         transparent={true}
         visible={isJsonModalVisible}
         onRequestClose={() => {
+          setJsonToShow(null); // Limpiar al cerrar
           setIsJsonModalVisible(!isJsonModalVisible);
         }}
       >
@@ -142,10 +199,16 @@ export default function MatchesScreen() {
             styles.modalView,
             { backgroundColor: colorScheme === 'dark' ? Colors.dark.background : Colors.light.background }
           ]}>
-            <ThemedText type="subtitle" style={styles.modalTitle}>JSON de Partidos Scrapeados</ThemedText>
+            <ThemedText type="subtitle" style={styles.modalTitle}>
+              {jsonToShow === 'organized' ? "JSON de Partidos Organizados" : "JSON de Partidos Originales"}
+            </ThemedText>
             <ScrollView style={styles.jsonScrollView}>
               <ThemedText style={styles.jsonText}>
-                {matchesData ? JSON.stringify(matchesData, null, 2) : "No hay datos para mostrar."}
+                {jsonToShow === 'original' && matchesData && JSON.stringify(matchesData, null, 2)}
+                {jsonToShow === 'organized' && organizedData && JSON.stringify(organizedData, null, 2)}
+                {(!jsonToShow || (jsonToShow === 'original' && !matchesData) || (jsonToShow === 'organized' && !organizedData)) &&
+                  "No hay datos para mostrar."
+                }
               </ThemedText>
             </ScrollView>
             <Button
@@ -185,6 +248,9 @@ const styles = StyleSheet.create({
     marginTop: 20,
     textAlign: 'center',
     paddingHorizontal: 20,
+  },
+  buttonSpacing: {
+    marginTop: 15, // Espacio entre el botón "Procesar" y "Ver Organizado"
   },
   detailItem: {
     fontSize: 16,

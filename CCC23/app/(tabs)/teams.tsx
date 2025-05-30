@@ -11,7 +11,7 @@ import { useIsFocused } from '@react-navigation/native'; // Para recargar al enf
 import { scrapeWorldFootballTeamData, ScrapedTeamInfo } from '../../api/scraper'; // Actualizado para la nueva función y tipo
 import { IconSymbol } from '@/components/ui/IconSymbol';
 
-const TIER_OPTIONS = ["TierS", "TierSred", "TierA", "TierC", "Red"] as const;
+const TIER_OPTIONS = ["TierS", "TierSred", "TierA", "TierC", "Red", "World"] as const;
 type TeamTier = typeof TIER_OPTIONS[number];
 
 export default function TeamsScreen() {
@@ -89,8 +89,10 @@ export default function TeamsScreen() {
           // Aquí podrías mostrar un Alert al usuario con scrapedData.error
           // Por ahora, no guardaremos si hay un error de scraping.
           // O podrías decidir guardar la URL con el mensaje de error.
+          Alert.alert('Error de Scraping', scrapedData.error); // Mostrar error al usuario
           setInputText(''); // Limpiar input incluso si hay error
-          setModalVisible(false);
+          // No cerrar el modal automáticamente si hay error de scraping, para que el usuario pueda corregir la URL
+          // setModalVisible(false); 
           return;
         }
 
@@ -122,10 +124,11 @@ export default function TeamsScreen() {
 
       } catch (e) {
         console.error('Error en handleAddItem (posiblemente al interactuar con AsyncStorage):', e);
-        // Aquí podrías mostrar un mensaje de error al usuario
+        Alert.alert('Error', 'Ocurrió un error al agregar el equipo.');
       }
     } else {
-      console.log('Input vacío, no se agrega team.');
+      // Esta condición ya está cubierta por las validaciones de arriba, pero se deja por si acaso.
+      console.log('Input vacío o tier no seleccionado, no se agrega team.');
     }
   };
 
@@ -149,7 +152,6 @@ export default function TeamsScreen() {
             } catch (e) {
               console.error('Error al eliminar el team de AsyncStorage:', e);
               Alert.alert("Error", "No se pudo eliminar el equipo.");
-              // Opcional: recargar los equipos para asegurar consistencia si la eliminación falló
               loadSavedTeams();
             }
           },
@@ -163,7 +165,7 @@ export default function TeamsScreen() {
     <TouchableOpacity onLongPress={() => handleDeleteTeam(item.originalUrl)} activeOpacity={0.7}>
       <ThemedView style={styles.teamItemContainer} lightColor="#f9f9f9" darkColor="#2C2C2E">
         {item.teamEmblemSrc ? (
-          <Image source={{ uri: item.teamEmblemSrc }} style={styles.teamLogo} onError={(e) => console.log("Error cargando imagen:", item.teamEmblemSrc, e.nativeEvent.error)} /> // eslint-disable-line @typescript-eslint/no-unused-vars
+          <Image source={{ uri: item.teamEmblemSrc }} style={styles.teamLogo} onError={(e) => console.log("Error cargando imagen:", item.teamEmblemSrc, e.nativeEvent.error)} />
         ) : <View style={styles.teamLogoPlaceholder}><IconSymbol name="questionmark.circle" size={24} color={Colors[colorScheme ?? 'light'].icon} /></View>}
         <View style={styles.teamInfoWrapper}>
           <ThemedText style={styles.teamName} numberOfLines={1} ellipsizeMode="tail">{item.teamName || item.originalUrl}</ThemedText>
@@ -191,7 +193,7 @@ export default function TeamsScreen() {
         <FlatList
           data={savedTeams}
           renderItem={renderTeamItem}
-          keyExtractor={(item, index) => item.originalUrl + index}
+          keyExtractor={(item, index) => item.originalUrl + index.toString()} // Asegurar que la key sea string
           style={styles.list}
           contentContainerStyle={styles.listContentContainer}
         />
@@ -238,7 +240,7 @@ export default function TeamsScreen() {
               style={[
                 styles.input,
                 {
-                  backgroundColor: colorScheme === 'dark' ? '#2C2C2E' : '#f0f0f0', // Un gris oscuro para el fondo del input en dark mode
+                  backgroundColor: colorScheme === 'dark' ? '#2C2C2E' : '#f0f0f0',
                   color: colorScheme === 'dark' ? Colors.dark.text : Colors.light.text,
                   borderColor: colorScheme === 'dark' ? '#555' : 'gray',
                 }
@@ -248,6 +250,7 @@ export default function TeamsScreen() {
               placeholder="Ingresa URL de worldfootball.net..."
               placeholderTextColor={colorScheme === 'dark' ? Colors.dark.icon : Colors.light.icon}
               keyboardType="url"
+              autoCapitalize="none" // Para URLs
             />
             <View style={styles.buttonContainer}>
               <Button
@@ -258,14 +261,14 @@ export default function TeamsScreen() {
                   setModalVisible(false);
                 }}
                 color={Platform.OS === 'ios' 
-                        ? (colorScheme === 'dark' ? Colors.dark.tint : '#f44336') // iOS: Texto blanco en oscuro, texto rojo en claro
-                        : '#f44336' // Android: Fondo rojo (texto blanco por defecto)
+                        ? (colorScheme === 'dark' ? Colors.dark.tint : '#f44336')
+                        : '#f44336'
                       }
               />
               <Button 
                 title="Agregar" 
                 onPress={handleAddItem} 
-                color={Colors.light.tint} // iOS: texto azul. Android: fondo azul (texto blanco).
+                color={Colors.light.tint}
                 disabled={!inputText.trim() || !selectedTier}
               />
             </View>
@@ -280,17 +283,16 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     alignItems: 'center',
-    paddingTop: Platform.OS === 'android' ? 20 : 0, // Ajuste para el header en Android
+    paddingTop: Platform.OS === 'android' ? 20 : 0,
   },
   centeredView: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)', // Fondo semitransparente para el overlay
+    backgroundColor: 'rgba(0,0,0,0.5)',
   },
   modalView: {
     margin: 20,
-    // backgroundColor se establece dinámicamente ahora
     borderRadius: 10,
     padding: 25,
     alignItems: 'center',
@@ -302,7 +304,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 4,
     elevation: 5,
-    width: '80%', // Ancho del modal
+    width: '80%',
   },
   modalTitle: {
     marginBottom: 15,
@@ -313,38 +315,39 @@ const styles = StyleSheet.create({
   modalSubtitle: {
     fontSize: 16,
     marginBottom: 10,
-    // color: Colors[colorScheme ?? 'light'].text, // Handled by ThemedText
+    alignSelf: 'flex-start', // Alinear a la izquierda
   },
   input: {
     height: 40,
-    // borderColor se establece dinámicamente ahora
     borderWidth: 1,
     marginBottom: 20,
     paddingHorizontal: 10,
     width: '100%',
     borderRadius: 5,
-    // color y backgroundColor se establecen dinámicamente ahora
   },
   buttonContainer: {
     flexDirection: 'row',
     justifyContent: 'space-around',
     width: '100%',
+    marginTop: 10, // Espacio sobre los botones
   },
   tierSelectionContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-between', // Distribute space evenly
+    justifyContent: 'space-around', // 'space-around' o 'space-between'
     width: '100%',
     marginBottom: 20,
-    flexWrap: 'wrap', // Allow wrapping if too many items for one line
+    flexWrap: 'wrap',
   },
   tierButton: {
     paddingVertical: 8,
     paddingHorizontal: 12,
     borderRadius: 5,
     borderWidth: 1,
-    marginHorizontal: 2, // Add some horizontal margin
-    marginBottom: 5, // Add some bottom margin for wrapped items
+    marginHorizontal: 2,
+    marginBottom: 5,
     alignItems: 'center',
+    minWidth: '22%', // Asegurar que los botones tengan un ancho mínimo para que quepan bien
+    justifyContent: 'center',
   },
   tierButtonText: {
     fontSize: 14,
@@ -358,69 +361,67 @@ const styles = StyleSheet.create({
     width: '95%',
   },
   listContentContainer: {
-    paddingBottom: 20, // Espacio al final de la lista
+    paddingBottom: 20,
   },
   teamItemContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 15,
     borderRadius: 8,
-    marginVertical: 5, // Espacio vertical entre ítems
-    // backgroundColor se maneja con ThemedView
-    // Sombras sutiles para dar profundidad
+    marginVertical: 5,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05, // Sombra muy sutil
+    shadowOpacity: 0.05,
     shadowRadius: 2,
-    elevation: 1, // Para Android
+    elevation: 1,
   },
   teamLogo: {
     width: 40,
     height: 40,
     marginRight: 15,
     resizeMode: 'contain',
-    borderRadius: 5, // Bordes redondeados para el logo
+    borderRadius: 5,
   },
   teamLogoPlaceholder: {
     width: 40,
     height: 40,
     marginRight: 15,
     borderRadius: 5,
-    backgroundColor: Colors.light.icon, // Un color de fondo para el placeholder
+    backgroundColor: Colors.light.icon, // Considerar usar Colors[colorScheme ?? 'light'].icon
     justifyContent: 'center',
     alignItems: 'center',
   },
   teamInfoWrapper: {
-    flex: 1, // Take remaining space
+    flex: 1,
     justifyContent: 'center',
   },
   teamDetailsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 2, // Espacio entre el nombre del equipo y esta fila de detalles
+    marginTop: 2,
   },
   teamName: {
     fontSize: 18,
-    flexShrink: 1, // Permite que el texto se encoja si es necesario
+    fontWeight: '600', // Un poco más de peso al nombre
+    flexShrink: 1,
   },
   teamTierText: {
     fontSize: 12,
     opacity: 0.7,
-    marginRight: 5, // Espacio si hay un navLinkText después
+    // marginRight: 5, // Eliminado, el navLinkWithMargin se encarga del espaciado
   },
   navLinkText: {
     fontSize: 11,
     opacity: 0.6,
-    marginTop: 2,
+    // marginTop: 2, // Eliminado, teamDetailsRow maneja el espaciado vertical
   },
-  noTeamsText: {
-  navLinkWithMargin: { // Estilo para añadir margen izquierdo si el tier está presente
-    marginLeft: 5,
+  navLinkWithMargin: {
+    marginLeft: 8, // Aumentado un poco el margen
   },
   noTeamsText: {
     marginTop: 30,
     fontSize: 16,
     textAlign: 'center',
-    color: '#666', // Considerar usar un color del tema
+    color: Colors.light.icon, // Usar un color del tema
   },
 });
