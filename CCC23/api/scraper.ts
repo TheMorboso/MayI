@@ -4,9 +4,11 @@ import * as cheerio from 'cheerio/slim'; // Cambiado para usar la versión slim
 export interface ScrapedTeamInfo {
   originalUrl: string;
   teamEmblemSrc: string | null;
-  firstNavLinkText: string | null;
+  firstNavLinkText: string | null; // Texto del primer enlace de navegación
   teamName?: string | null; // Nuevo campo para el nombre del equipo
+  firstNavLinkHref?: string | null; // URL del primer enlace de navegación
   error?: string; // Optional field for any scraping errors
+  tier?: "TierS" | "TierSred" | "TierA" | "TierC" | "Red" | null; // Add tier attribute
 }
 
 
@@ -45,8 +47,9 @@ export async function scrapeWorldFootballTeamData(url: string): Promise<ScrapedT
     const teamEmblemSrc = $(emblemSelector).attr('src') || null;
 
     // Selector para el texto del primer enlace de navegación
-    const navLinkSelector = '#navi > div.subnavi > ul > li:nth-child(1) > a';
-    const firstNavLinkText = $(navLinkSelector).text().trim() || null;
+    const navLinkElement = $('#navi > div.subnavi > ul > li:nth-child(1) > a');
+    const firstNavLinkText = navLinkElement.text().trim() || null;
+    let firstNavLinkHref = navLinkElement.attr('href')?.trim() || null;
 
     // Selector para el nombre del equipo
     const teamNameSelector = '#site > div.white > div.sidebar > div.box.emblemwrapper > div.head > h2';
@@ -59,12 +62,19 @@ export async function scrapeWorldFootballTeamData(url: string): Promise<ScrapedT
         absoluteEmblemSrc = new URL(teamEmblemSrc, siteBaseUrl).href;
     }
 
+    // Si la URL del navLink es relativa, convertirla a absoluta
+    if (firstNavLinkHref && !firstNavLinkHref.startsWith('http')) {
+        const siteBaseUrl = new URL(fullUrl).origin;
+        firstNavLinkHref = new URL(firstNavLinkHref, siteBaseUrl).href;
+    }
+
 
     return {
       originalUrl: url,
       teamEmblemSrc: absoluteEmblemSrc,
       firstNavLinkText: firstNavLinkText,
       teamName: teamName,
+      firstNavLinkHref: firstNavLinkHref,
     };
 
   } catch (error: any) {
@@ -74,6 +84,7 @@ export async function scrapeWorldFootballTeamData(url: string): Promise<ScrapedT
       teamEmblemSrc: null,
       firstNavLinkText: null,
       teamName: null,
+      firstNavLinkHref: null,
       error: error.message || 'Error desconocido durante el scraping',
     };
   }

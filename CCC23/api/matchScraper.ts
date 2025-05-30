@@ -9,7 +9,7 @@ export interface MatchDetails {
   equipoContrario?: string | null;
   resultado?: string | null;
   error?: string | null;
-  sourceUrl?: string | null; // Para saber de qué URL se extrajo
+  match?: string | null; // Nuevo atributo para el enlace del partido
 }
 
 export async function scrapeMatchDetails(url: string): Promise<MatchDetails[]> {
@@ -30,8 +30,7 @@ export async function scrapeMatchDetails(url: string): Promise<MatchDetails[]> {
     if (!response.ok) {
       console.error(`[scrapeMatchDetails] Error al acceder a la URL (${response.status}): ${fullUrl}`);
       return [{
-        sourceUrl: url,
-        error: `Error al acceder a la URL (${response.status}): ${fullUrl}`,
+        error: `Error al acceder a la URL (${response.status}) para ${url}`,
       }];
     }
 
@@ -53,7 +52,7 @@ export async function scrapeMatchDetails(url: string): Promise<MatchDetails[]> {
     
     if (tableElement.length === 0) {
       console.warn('[scrapeMatchDetails] Tabla de partidos no encontrada.');
-      return [{ error: 'Tabla de partidos no encontrada en la página.', sourceUrl: url }];
+      return [{ error: `Tabla de partidos no encontrada en la página ${url}.` }];
     }
 
     tableElement.find('tr').each((index, rowElement) => {
@@ -65,24 +64,40 @@ export async function scrapeMatchDetails(url: string): Promise<MatchDetails[]> {
       }
 
       // Extracción de datos para cada celda de la fila actual
-      const week = row.find('td:nth-child(1)').text().trim() || null;
+      // const week = row.find('td:nth-child(1)').text().trim() || null; // Original: obtenía el texto
+      let week = row.find('td:nth-child(1) > a').attr('href')?.trim() || null; // Nuevo: obtener el href del enlace
+
+      // Convertir link de 'week' a absoluto si es necesario
+      if (week && !week.startsWith('http')) {
+        const baseSiteUrl = new URL(fullUrl).origin;
+        week = new URL(week, baseSiteUrl).href;
+      }
       // Para 'fecha', intentar obtener de 'a' y luego directamente de 'td'
       const fecha = row.find('td:nth-child(2) > a').text().trim() || row.find('td:nth-child(2)').text().trim() || null;
       const hora = row.find('td:nth-child(3)').text().trim() || null;
       const lugar = row.find('td:nth-child(4)').text().trim() || null; // H/A
       const equipoContrario = row.find('td:nth-child(6) > a').text().trim() || null;
-      const resultado = row.find('td:nth-child(7) > a').text().trim() || null;
+      
+      const resultadoLinkElement = row.find('td:nth-child(7) > a');
+      const resultado = resultadoLinkElement.text().trim() || null;
+      let matchLink = resultadoLinkElement.attr('href') || null;
+
+      // Convertir link relativo a absoluto si es necesario
+      if (matchLink && !matchLink.startsWith('http')) {
+        const baseSiteUrl = new URL(fullUrl).origin; // Obtener la base de la URL original (ej: https://www.worldfootball.net)
+        matchLink = new URL(matchLink, baseSiteUrl).href;
+      }
 
       // Considerar una fila como un partido válido si tiene al menos fecha y equipo contrario o resultado
       if (fecha && (equipoContrario || resultado || week )) { // week también puede indicar un partido válido (ej. "Final")
         allMatches.push({
-          sourceUrl: url,
           week,
           fecha,
           hora,
           lugar,
           equipoContrario,
           resultado,
+          match: matchLink, // Guardar el enlace del partido
         });
       }
     });
@@ -90,7 +105,7 @@ export async function scrapeMatchDetails(url: string): Promise<MatchDetails[]> {
     if (allMatches.length === 0 && tableElement.find('tr').length > 2) { // Si hay filas pero no se extrajeron partidos
         console.warn('[scrapeMatchDetails] Tabla encontrada con filas, pero no se extrajeron partidos válidos. Verifique la estructura.');
         // Podrías devolver un mensaje específico aquí si lo deseas, ej:
-        // return [{ error: 'No se encontraron partidos válidos en la tabla.', sourceUrl: url }];
+        // return [{ error: `No se encontraron partidos válidos en la tabla de ${url}.` }];
     }
 
     console.log(`[scrapeMatchDetails] Se extrajeron datos para ${allMatches.length} partidos desde ${url}`);
@@ -99,8 +114,7 @@ export async function scrapeMatchDetails(url: string): Promise<MatchDetails[]> {
   } catch (error: any) {
     console.error(`[scrapeMatchDetails] Error durante el scraping de detalles del partido desde ${url}:`, error);
     return [{
-      sourceUrl: url,
-      error: error.message || 'Error desconocido durante el scraping de detalles del partido',
+      error: `Error en scraping para ${url}: ${error.message || 'Error desconocido'}`,
     }];
   }
 }

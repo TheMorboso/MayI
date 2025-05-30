@@ -11,11 +11,15 @@ import { useIsFocused } from '@react-navigation/native'; // Para recargar al enf
 import { scrapeWorldFootballTeamData, ScrapedTeamInfo } from '../../api/scraper'; // Actualizado para la nueva función y tipo
 import { IconSymbol } from '@/components/ui/IconSymbol';
 
+const TIER_OPTIONS = ["TierS", "TierSred", "TierA", "TierC", "Red"] as const;
+type TeamTier = typeof TIER_OPTIONS[number];
+
 export default function TeamsScreen() {
   const [modalVisible, setModalVisible] = useState(false);
   const [inputText, setInputText] = useState('');
   const [savedTeams, setSavedTeams] = useState<ScrapedTeamInfo[]>([]);
   const [isLoadingTeams, setIsLoadingTeams] = useState(true);
+  const [selectedTier, setSelectedTier] = useState<TeamTier | null>(null);
   const navigation = useNavigation();
   const colorScheme = useColorScheme();
   const isFocused = useIsFocused();
@@ -26,7 +30,10 @@ export default function TeamsScreen() {
     navigation.setOptions({
       headerRight: () => (
         <TouchableOpacity
-          onPress={() => setModalVisible(true)}
+          onPress={() => {
+            setModalVisible(true);
+            setSelectedTier(null); // Reset tier selection when opening modal
+          }}
           style={{
             backgroundColor: '#4CAF50', // Color verde del botón
             width: 32,
@@ -64,12 +71,19 @@ export default function TeamsScreen() {
 
   const handleAddItem = async () => {
     const teamUrl = inputText.trim();
-    if (teamUrl) {
+    if (!teamUrl) {
+      Alert.alert('Entrada Vacía', 'Por favor, ingresa la URL del equipo.');
+      return;
+    }
+    if (!selectedTier) {
+      Alert.alert('Seleccionar Tier', 'Por favor, selecciona un tier para el equipo.');
+      return;
+    }
+
+    if (teamUrl && selectedTier) {
       try {
-        // Podrías añadir un indicador de carga aquí
         console.log(`Iniciando scraping para: ${teamUrl}`);
         const scrapedData = await scrapeWorldFootballTeamData(teamUrl);
-
         if (scrapedData.error) {
           console.error('Error de scraping:', scrapedData.error);
           // Aquí podrías mostrar un Alert al usuario con scrapedData.error
@@ -80,28 +94,32 @@ export default function TeamsScreen() {
           return;
         }
 
-        // 1. Obtener los teams existentes
+        const teamWithTier: ScrapedTeamInfo = {
+          ...scrapedData,
+          tier: selectedTier,
+        };
+
         const existingTeamsJson = await AsyncStorage.getItem(TEAMS_STORAGE_KEY);
         let teamsArray: ScrapedTeamInfo[] = existingTeamsJson ? JSON.parse(existingTeamsJson) : [];
 
-        // Opcional: Verificar si ya existe un team con la misma URL para evitar duplicados
-        const existingIndex = teamsArray.findIndex(team => team.originalUrl === scrapedData.originalUrl);
+        const existingIndex = teamsArray.findIndex(team => team.originalUrl === teamWithTier.originalUrl);
         if (existingIndex > -1) {
-          console.log(`El team con URL ${scrapedData.originalUrl} ya existe. Actualizando...`);
-          teamsArray[existingIndex] = scrapedData; // Actualizar el existente
+          console.log(`El team con URL ${teamWithTier.originalUrl} ya existe. Actualizando...`);
+          teamsArray[existingIndex] = teamWithTier; 
         } else {
-          teamsArray.push(scrapedData);
+          teamsArray.push(teamWithTier);
         }
 
-        // 2. Guardar el array actualizado
         await AsyncStorage.setItem(TEAMS_STORAGE_KEY, JSON.stringify(teamsArray));
 
-        console.log('Datos del team scrapeados y guardados:', scrapedData);
+        console.log('Datos del team scrapeados y guardados (con tier):', teamWithTier);
         console.log('Todos los teams guardados:', teamsArray);
 
         setInputText('');
+        setSelectedTier(null); // Reset selected tier
         setSavedTeams(teamsArray); // Actualizar estado local para reflejar el cambio inmediatamente
         setModalVisible(false);
+
       } catch (e) {
         console.error('Error en handleAddItem (posiblemente al interactuar con AsyncStorage):', e);
         // Aquí podrías mostrar un mensaje de error al usuario
@@ -145,9 +163,21 @@ export default function TeamsScreen() {
     <TouchableOpacity onLongPress={() => handleDeleteTeam(item.originalUrl)} activeOpacity={0.7}>
       <ThemedView style={styles.teamItemContainer} lightColor="#f9f9f9" darkColor="#2C2C2E">
         {item.teamEmblemSrc ? (
-          <Image source={{ uri: item.teamEmblemSrc }} style={styles.teamLogo} onError={(e) => console.log("Error cargando imagen:", item.teamEmblemSrc, e.nativeEvent.error)} />
+          <Image source={{ uri: item.teamEmblemSrc }} style={styles.teamLogo} onError={(e) => console.log("Error cargando imagen:", item.teamEmblemSrc, e.nativeEvent.error)} /> // eslint-disable-line @typescript-eslint/no-unused-vars
         ) : <View style={styles.teamLogoPlaceholder}><IconSymbol name="questionmark.circle" size={24} color={Colors[colorScheme ?? 'light'].icon} /></View>}
-        <ThemedText style={styles.teamName} numberOfLines={1} ellipsizeMode="tail">{item.teamName || item.originalUrl}</ThemedText>
+        <View style={styles.teamInfoWrapper}>
+          <ThemedText style={styles.teamName} numberOfLines={1} ellipsizeMode="tail">{item.teamName || item.originalUrl}</ThemedText>
+          <View style={styles.teamDetailsRow}>
+            {item.tier && (
+              <ThemedText style={styles.teamTierText}>Tier: {item.tier}</ThemedText>
+            )}
+            {item.firstNavLinkText && (
+              <ThemedText style={[styles.navLinkText, item.tier ? styles.navLinkWithMargin : {}]} numberOfLines={1} ellipsizeMode="tail">
+                {item.firstNavLinkText}
+              </ThemedText>
+            )}
+          </View>
+        </View>
       </ThemedView>
     </TouchableOpacity>
   );
@@ -174,6 +204,8 @@ export default function TeamsScreen() {
         transparent={true}
         visible={modalVisible}
         onRequestClose={() => {
+          setInputText('');
+          setSelectedTier(null);
           setModalVisible(!modalVisible);
         }}
       >
@@ -183,6 +215,25 @@ export default function TeamsScreen() {
             { backgroundColor: colorScheme === 'dark' ? Colors.dark.background : Colors.light.background }
           ]}>
             <ThemedText style={styles.modalTitle}>Agregar Nuevo Team</ThemedText>
+            <ThemedText style={styles.modalSubtitle}>Seleccionar Tier:</ThemedText>
+            <View style={styles.tierSelectionContainer}>
+              {TIER_OPTIONS.map((tier) => (
+                <TouchableOpacity
+                  key={tier}
+                  style={[
+                    styles.tierButton,
+                    { borderColor: Colors[colorScheme ?? 'light'].icon },
+                    selectedTier === tier && { backgroundColor: Colors[colorScheme ?? 'light'].tint },
+                  ]}
+                  onPress={() => setSelectedTier(tier)}
+                >
+                  <ThemedText style={[
+                    styles.tierButtonText,
+                    { color: selectedTier === tier ? '#FFFFFF' : Colors[colorScheme ?? 'light'].text }
+                  ]}>{tier}</ThemedText>
+                </TouchableOpacity>
+              ))}
+            </View>
             <TextInput
               style={[
                 styles.input,
@@ -201,7 +252,11 @@ export default function TeamsScreen() {
             <View style={styles.buttonContainer}>
               <Button
                 title="Cancelar"
-                onPress={() => setModalVisible(false)}
+                onPress={() => {
+                  setInputText('');
+                  setSelectedTier(null);
+                  setModalVisible(false);
+                }}
                 color={Platform.OS === 'ios' 
                         ? (colorScheme === 'dark' ? Colors.dark.tint : '#f44336') // iOS: Texto blanco en oscuro, texto rojo en claro
                         : '#f44336' // Android: Fondo rojo (texto blanco por defecto)
@@ -211,6 +266,7 @@ export default function TeamsScreen() {
                 title="Agregar" 
                 onPress={handleAddItem} 
                 color={Colors.light.tint} // iOS: texto azul. Android: fondo azul (texto blanco).
+                disabled={!inputText.trim() || !selectedTier}
               />
             </View>
           </View>
@@ -254,6 +310,11 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
   },
+  modalSubtitle: {
+    fontSize: 16,
+    marginBottom: 10,
+    // color: Colors[colorScheme ?? 'light'].text, // Handled by ThemedText
+  },
   input: {
     height: 40,
     // borderColor se establece dinámicamente ahora
@@ -268,6 +329,26 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-around',
     width: '100%',
+  },
+  tierSelectionContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between', // Distribute space evenly
+    width: '100%',
+    marginBottom: 20,
+    flexWrap: 'wrap', // Allow wrapping if too many items for one line
+  },
+  tierButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 5,
+    borderWidth: 1,
+    marginHorizontal: 2, // Add some horizontal margin
+    marginBottom: 5, // Add some bottom margin for wrapped items
+    alignItems: 'center',
+  },
+  tierButtonText: {
+    fontSize: 14,
+    fontWeight: '500',
   },
   title: {
     marginTop: 20,
@@ -309,9 +390,32 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  teamInfoWrapper: {
+    flex: 1, // Take remaining space
+    justifyContent: 'center',
+  },
+  teamDetailsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 2, // Espacio entre el nombre del equipo y esta fila de detalles
+  },
   teamName: {
     fontSize: 18,
     flexShrink: 1, // Permite que el texto se encoja si es necesario
+  },
+  teamTierText: {
+    fontSize: 12,
+    opacity: 0.7,
+    marginRight: 5, // Espacio si hay un navLinkText después
+  },
+  navLinkText: {
+    fontSize: 11,
+    opacity: 0.6,
+    marginTop: 2,
+  },
+  noTeamsText: {
+  navLinkWithMargin: { // Estilo para añadir margen izquierdo si el tier está presente
+    marginLeft: 5,
   },
   noTeamsText: {
     marginTop: 30,

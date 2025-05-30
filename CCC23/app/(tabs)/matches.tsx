@@ -67,7 +67,6 @@ export default function MatchesScreen() {
         if (!team.originalUrl) {
           console.warn(`Equipo omitido por no tener URL: ${team.teamName || 'Nombre desconocido'}`);
           allScrapedMatches.push({
-            sourceUrl: `Equipo: ${team.teamName || 'Desconocido'}`,
             error: 'URL original no encontrada para este equipo.'
           });
           continue;
@@ -98,7 +97,7 @@ export default function MatchesScreen() {
     } catch (error: any) {
       console.error('Error al obtener detalles del partido:', error);
       Alert.alert('Error', error.message || 'Ocurrió un error al obtener los detalles del partido.');
-      setMatchesData([{ error: error.message || 'Error desconocido', sourceUrl: 'Error general en cliente' }]);
+      setMatchesData([{ error: error.message  }]);
     } finally {
       setIsLoading(false);
     }
