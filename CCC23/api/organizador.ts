@@ -72,10 +72,33 @@ export function organizeMatchData(matches: MatchDetails[]): OrganizedMatchInfo[]
             // --- INICIO DE CONDICIONALES (MODIFICAR SEGÚN NECESIDAD) ---
             // Usa 'baseSlugForCondition' para tus comparaciones
             if (baseSlugForCondition === "champions-league") {
-              competicionValue = "Champions";
+              competicionValue = "Competicion";
             } else if (baseSlugForCondition === "ita-supercoppa") { // Ejemplo basado en tu URL
-              competicionValue = "Supercoppa Italiana"; // Asigna el valor que desees
+              competicionValue = "Competicion"; // Asigna el valor que desees
+            }else if (baseSlugForCondition === "freundschaft-vereine") { // Ejemplo basado en tu URL
+              competicionValue = "Amistoso"; // Asigna el valor que desees
+            }else if (baseSlugForCondition === "uefa-super-cup") { // Ejemplo basado en tu URL
+              competicionValue = "Competicion"; // Asigna el valor que desees
+            }else if (baseSlugForCondition === "esp-primera-division") { // Ejemplo basado en tu URL
+              competicionValue = "Primera division"; // Asigna el valor que desees
+            }else if (baseSlugForCondition === "esp-supercopa") { // Ejemplo basado en tu URL
+              competicionValue = "Competicion"; // Asigna el valor que desees
+            }else if (baseSlugForCondition === "esp-copa-del-rey") { // Ejemplo basado en tu URL
+              competicionValue = "Competicion"; // Asigna el valor que desees
+            }else if (baseSlugForCondition === "klub-wm") { // Ejemplo basado en tu URL
+              competicionValue = "Competicion"; // Asigna el valor que desees
+            }else if (baseSlugForCondition === "eng-premier-league") { // Ejemplo basado en tu URL
+              competicionValue = "Premier league"; // Asigna el valor que desees
+            }else if (baseSlugForCondition === "eng-league-cup") { // Ejemplo basado en tu URL
+              competicionValue = "Competicion"; // Asigna el valor que desees
+            }else if (baseSlugForCondition === "eng-fa-cup") { // Ejemplo basado en tu URL
+              competicionValue = "Competicion"; // Asigna el valor que desees
+            }else if (baseSlugForCondition === "ita-serie-a") { // Ejemplo basado en tu URL
+              competicionValue = "Serie A"; // Asigna el valor que desees
+            }else if (baseSlugForCondition === "ita-coppa-italia") { // Ejemplo basado en tu URL
+              competicionValue = "Competicion"; // Asigna el valor que desees
             }
+           
             // Agrega más 'else if' aquí para otros textos extraídos
             // else if (extractedText === "europa-league") {
             //   competicionValue = "Europa League";
