@@ -9,11 +9,15 @@ export interface MatchDetails {
   equipoContrario?: string | null;
   resultado?: string | null;
   error?: string | null;
-  match?: string | null; // Nuevo atributo para el enlace del partido
+  match?: string | null; 
+  Team?: string | null; // Nombre del equipo para el que se hizo el scrape
 }
 
-export async function scrapeMatchDetails(url: string): Promise<MatchDetails[]> {
-  console.log(`[scrapeMatchDetails] Iniciando scraping para URL: ${url}`);
+export async function scrapeMatchDetails(
+  url: string, 
+  teamName: string | null // Nombre del equipo como contexto
+): Promise<MatchDetails[]> {
+  console.log(`[scrapeMatchDetails] Iniciando scraping para URL: ${url} (Equipo: ${teamName || 'Desconocido'})`);
   try {
     let fullUrl = url;
     if (!url.startsWith('http://') && !url.startsWith('https://')) {
@@ -30,6 +34,7 @@ export async function scrapeMatchDetails(url: string): Promise<MatchDetails[]> {
     if (!response.ok) {
       console.error(`[scrapeMatchDetails] Error al acceder a la URL (${response.status}): ${fullUrl}`);
       return [{
+        Team: teamName,
         error: `Error al acceder a la URL (${response.status}) para ${url}`,
       }];
     }
@@ -52,7 +57,7 @@ export async function scrapeMatchDetails(url: string): Promise<MatchDetails[]> {
     
     if (tableElement.length === 0) {
       console.warn('[scrapeMatchDetails] Tabla de partidos no encontrada.');
-      return [{ error: `Tabla de partidos no encontrada en la página ${url}.` }];
+      return [{ Team: teamName, error: `Tabla de partidos no encontrada en la página ${url}.` }];
     }
 
     tableElement.find('tr').each((index, rowElement) => {
@@ -98,6 +103,7 @@ export async function scrapeMatchDetails(url: string): Promise<MatchDetails[]> {
           equipoContrario,
           resultado,
           match: matchLink, // Guardar el enlace del partido
+          Team: teamName, // Guardar el nombre del equipo de contexto
         });
       }
     });
@@ -114,6 +120,7 @@ export async function scrapeMatchDetails(url: string): Promise<MatchDetails[]> {
   } catch (error: any) {
     console.error(`[scrapeMatchDetails] Error durante el scraping de detalles del partido desde ${url}:`, error);
     return [{
+      Team: teamName,
       error: `Error en scraping para ${url}: ${error.message || 'Error desconocido'}`,
     }];
   }

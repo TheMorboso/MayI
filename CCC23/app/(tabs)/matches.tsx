@@ -85,6 +85,7 @@ export default function MatchesScreen() {
         if (!team.originalUrl) {
           console.warn(`Equipo omitido por no tener URL: ${team.teamName || 'Nombre desconocido'}`);
           allScrapedMatches.push({
+            Team: team.teamName || 'unknown_team_name_in_loop', // Usar teamName para el contexto
             error: 'URL original no encontrada para este equipo.'
           });
           continue;
@@ -105,7 +106,7 @@ export default function MatchesScreen() {
         }
 
         console.log(`Scrapeando partidos para: ${team.teamName || fullUrl}`);
-        const scrapedDataForTeam = await scrapeMatchDetails(fullUrl);
+        const scrapedDataForTeam = await scrapeMatchDetails(fullUrl, team.teamName || null); // Pasar team.teamName como contexto
         allScrapedMatches.push(...scrapedDataForTeam); // Agrega los partidos de este equipo al array general
       }
 
@@ -115,7 +116,7 @@ export default function MatchesScreen() {
     } catch (error: any) {
       console.error('Error al obtener detalles del partido:', error);
       Alert.alert('Error', error.message || 'Ocurrió un error al obtener los detalles del partido.');
-      setMatchesData([{ error: error.message  }]);
+      setMatchesData([{ error: error.message, Team: 'general_error_context' }]); // Usar Team para el contexto genérico
     } finally {
       setIsLoading(false);
     }
