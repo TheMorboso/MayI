@@ -1,35 +1,30 @@
-// c:\Users\Mauri\Desktop\CCC23\MayI\CCC23\api\scraper.ts
-import * as cheerio from 'cheerio/slim'; // Cambiado para usar la versión slim
+import * as cheerio from 'cheerio/slim';
 
 export interface ScrapedTeamInfo {
   originalUrl: string;
   teamEmblemSrc: string | null;
-  firstNavLinkText: string | null; // Texto del primer enlace de navegación
-  teamName?: string | null; // Nuevo campo para el nombre del equipo
-  firstNavLinkHref?: string | null; // URL del primer enlace de navegación
-  error?: string; // Optional field for any scraping errors
-  tier?: "TierS" | "TierSred" | "TierA" | "TierC" | "Red" | null; // Add tier attribute
+  firstNavLinkText: string | null;
+  teamName?: string | null;
+  firstNavLinkHref?: string | null;
+  error?: string;
+  tier?: "TierS" | "TierSred" | "TierA" | "TierC" | "Red" | null;
 }
 
 
 export async function scrapeWorldFootballTeamData(url: string): Promise<ScrapedTeamInfo> {
   try {
-    // Asegurarse de que la URL tenga un protocolo si no lo tiene
-    // Aunque mencionaste que el formato será consistente, esto es una buena práctica.
     let fullUrl = url;
     if (!url.startsWith('http://') && !url.startsWith('https://')) {
-      fullUrl = `https://${url}`; // Asumir https si no se especifica
+      fullUrl = `https://${url}`;
     }
 
     const response = await fetch(fullUrl, {
-      // Algunos sitios pueden requerir un User-Agent para devolver contenido correctamente
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
       }
     });
 
     if (!response.ok) {
-      console.error(`Error al obtener la URL ${fullUrl}: ${response.status} ${response.statusText}`);
       return {
         originalUrl: url,
         teamEmblemSrc: null,
@@ -42,27 +37,21 @@ export async function scrapeWorldFootballTeamData(url: string): Promise<ScrapedT
     const htmlText = await response.text();
     const $ = cheerio.load(htmlText);
 
-    // Selector para la imagen del emblema
     const emblemSelector = '#site > div.white > div.sidebar > div.box.emblemwrapper > div:nth-child(2) > div.emblem > a > img';
     const teamEmblemSrc = $(emblemSelector).attr('src') || null;
 
-    // Selector para el texto del primer enlace de navegación
     const navLinkElement = $('#navi > div.subnavi > ul > li:nth-child(1) > a');
     const firstNavLinkText = navLinkElement.text().trim() || null;
     let firstNavLinkHref = navLinkElement.attr('href')?.trim() || null;
 
-    // Selector para el nombre del equipo
     const teamNameSelector = '#site > div.white > div.sidebar > div.box.emblemwrapper > div.head > h2';
     const teamName = $(teamNameSelector).text().trim() || null;
     
-    // Si la URL del emblema es relativa, convertirla a absoluta
     let absoluteEmblemSrc = teamEmblemSrc;
     if (teamEmblemSrc && !teamEmblemSrc.startsWith('http')) {
         const siteBaseUrl = new URL(fullUrl).origin;
         absoluteEmblemSrc = new URL(teamEmblemSrc, siteBaseUrl).href;
     }
-
-    // Si la URL del navLink es relativa, convertirla a absoluta
     if (firstNavLinkHref && !firstNavLinkHref.startsWith('http')) {
         const siteBaseUrl = new URL(fullUrl).origin;
         firstNavLinkHref = new URL(firstNavLinkHref, siteBaseUrl).href;
@@ -78,7 +67,6 @@ export async function scrapeWorldFootballTeamData(url: string): Promise<ScrapedT
     };
 
   } catch (error: any) {
-    console.error(`Error durante el scraping de ${url}:`, error);
     return {
       originalUrl: url,
       teamEmblemSrc: null,

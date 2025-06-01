@@ -15,12 +15,10 @@ export default function TabLayout() {
     <Tabs
       screenOptions={{
         tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
-        // headerShown: false, // Lo quitamos para controlar por pantalla
         tabBarButton: HapticTab,
         tabBarBackground: TabBarBackground,
         tabBarStyle: Platform.select({
           ios: {
-            // Use a transparent background on iOS to show the blur effect
             position: 'absolute',
           },
           default: {},
@@ -29,7 +27,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="matches"
         options={{
-          headerShown: true, // Mostrar el header para esta pestaña
+          headerShown: true,
           title: 'Matches',
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
         }}
@@ -42,28 +40,27 @@ export default function TabLayout() {
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="paperplane.fill" color={color} />,
           headerRight: () => (
             <TouchableOpacity
-              onPress={() => console.log('Add button on Teams screen pressed')}
+              onPress={() => { /* Acción del botón */ }}
               style={{
-                backgroundColor: '#4CAF50', // Un color verde
+                backgroundColor: '#4CAF50',
                 width: 32,
                 height: 32,
-                borderRadius: 4, // Bordes ligeramente redondeados
+                borderRadius: 4,
                 justifyContent: 'center',
                 alignItems: 'center',
-                marginRight: 15, // Espacio desde el borde derecho
+                marginRight: 15,
               }}
             >
-              {/* Usaremos 'plus' como nombre del SF Symbol. Asegúrate de que esté mapeado en IconSymbol.tsx */}
               <IconSymbol name="plus" size={20} color="white" />
             </TouchableOpacity>
           ),
         }}
       />
       <Tabs.Screen
-        name="config" // Este será el nombre del archivo .tsx para esta pantalla
+        name="config"
         options={{
           title: 'Config',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="gearshape.fill" color={color} />, // Puedes cambiar 'gearshape.fill' por el ícono que prefieras
+          tabBarIcon: ({ color }) => <IconSymbol size={28} name="gearshape.fill" color={color} />,
         }}
       />
     </Tabs>
