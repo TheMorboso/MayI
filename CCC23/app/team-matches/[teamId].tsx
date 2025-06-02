@@ -1,13 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { FlatList, ActivityIndicator, StyleSheet, Alert, View } from 'react-native';
+import { FlatList, ActivityIndicator, StyleSheet, View, Image } from 'react-native'; // Importar Image
 import { useLocalSearchParams, Stack } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { PostScudettoMatchInfo } from '@/api/postscudetto';
 import { ThemedView } from '@/components/ThemedView';
 import { ThemedText } from '@/components/ThemedText';
-import { Colors } from '@/constants/Colors';
-import { useColorScheme } from '@/hooks/useColorScheme';
 
 const POST_SCUDETTO_DATA_KEY = 'postScudettoAllMatchData'; // Debe coincidir con la clave en matches.tsx
 
@@ -22,7 +20,7 @@ export default function TeamMatchesScreen() {
   const [teamMatches, setTeamMatches] = useState<PostScudettoMatchInfo[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const colorScheme = useColorScheme(); // colorScheme está disponible aquí
+  // const colorScheme = useColorScheme(); // No se usa directamente aquí, pero podría ser útil para estilos
 
   useEffect(() => {
     const loadMatches = async () => {
@@ -64,8 +62,16 @@ export default function TeamMatchesScreen() {
       item.Competicion.trim() !== '' && 
       (index === 0 || item.Competicion !== prevItem?.Competicion);
 
-    // Determinar el color del separador basado en el tema actual
-    const separatorColor = colorScheme === 'dark' ? Colors.dark.text : Colors.light.text;
+    const opponentTier = item.opponentTier; // Usar el tier del oponente
+    const shouldShowOpponentEmblem = (opponentTier === 'TierS' || opponentTier === 'TierSred') && item.opponentEmblemSrc; // Usar emblema y tier del oponente
+    
+    let opponentDisplayName = item.equipoContrario || 'Oponente N/A';
+    // Modificación: Incluir item.Competicion === 'Competencia' en la condición
+    if (
+      (item.isMainLeagueCompetition || item.Competicion === 'Competencia' || item.Competicion === 'Competicion') && 
+      !item.opponentTier) {
+      opponentDisplayName = 'TierD';
+    }
 
     // Casos especiales para "Champion", "Post scudetto" y "Negativo"
     if (item.Status === 'Champion') {
@@ -92,6 +98,15 @@ export default function TeamMatchesScreen() {
       );
     }
 
+    // NUEVO: Manejar "Parón Internacional"
+    // Este chequeo debe ir ANTES del renderizado normal del partido.
+    if (item.Competicion === 'Parón Internacional') {
+      return (
+        <View style={[styles.matchItem, styles.statusHighlightItem, styles.internationalBreakItem]}>
+          <ThemedText style={styles.statusHighlightText}>PARÓN INTERNACIONAL</ThemedText>
+        </View>
+      );
+    }
     // Renderizado normal del partido si no es Champion ni Post Scudetto
 
     return (
@@ -116,10 +131,17 @@ export default function TeamMatchesScreen() {
                 <ThemedText style={styles.matchDateSmall}>{item.fecha || 'Fecha N/A'}</ThemedText>
                 {item.hora && <ThemedText style={styles.matchTimeSmall}>{item.hora}</ThemedText>}
               </View>
-              {/* Aplicar el color dinámico al separador */}
-              <View style={[styles.verticalSeparator, { backgroundColor: separatorColor }]} />
-              <ThemedText style={styles.matchOpponentSmall} numberOfLines={2} ellipsizeMode="tail">
-                {item.equipoContrario || 'Oponente N/A'}
+              <View style={styles.verticalSeparator} />
+              {shouldShowOpponentEmblem && ( // Condición basada en el oponente
+                <Image
+                  source={{ uri: item.opponentEmblemSrc! }} // Usar el emblema del oponente
+                  style={styles.teamEmblemStyle} // El estilo puede ser el mismo
+                />
+              )}
+              <ThemedText 
+                style={styles.matchOpponentSmall} // Se ajustará el estilo abajo
+                numberOfLines={2} ellipsizeMode="tail">
+                {opponentDisplayName}
               </ThemedText>
             </View>
 
@@ -137,7 +159,7 @@ export default function TeamMatchesScreen() {
   if (isLoading) {
     return (
       <ThemedView style={styles.centered}>
-        <ActivityIndicator size="large" color={Colors[colorScheme ?? 'light'].tint} />
+        <ActivityIndicator size="large" />
         <ThemedText style={{ marginTop: 10 }}>Cargando partidos de {teamNameForDisplay}...</ThemedText>
       </ThemedView>
     );
@@ -251,10 +273,16 @@ const styles = StyleSheet.create({
     minWidth: 55, 
   },
   verticalSeparator: { // El backgroundColor se aplicará dinámicamente
-    height: '60%', 
+    height: '60%',
     width: 1,
-    marginHorizontal: 8, 
+    marginHorizontal: 8,
     opacity: 0.6, // Aumentada la opacidad para mayor visibilidad
+    // El color del separador se tomará del tema a través de un componente ThemedView o similar si es necesario,
+    // o se puede definir aquí si es estático o se pasa como prop.
+    // Por ahora, lo dejamos sin color explícito para que herede o se defina en un nivel superior si es necesario.
+    // Si se quiere un color específico, se puede añadir:
+    // backgroundColor: '#cccccc', // Ejemplo de color claro
+    // backgroundColor: '#555555', // Ejemplo de color oscuro
   },
   matchDateSmall: { 
     fontSize: 11, 
@@ -268,6 +296,7 @@ const styles = StyleSheet.create({
     flex: 1, 
     fontSize: 13, 
     fontWeight: '600',
+    // marginLeft: 8, // Se elimina este margen, el emblema lo gestionará
   },
   locationContainer: { 
     minWidth: 15, 
@@ -293,10 +322,20 @@ const styles = StyleSheet.create({
   negativoItem: {
     backgroundColor: '#8B0000', // Maroon, un rojo oscuro diferente para Negativo
   },
+  internationalBreakItem: { // Nuevo estilo para el parón internacional
+    backgroundColor: '#4682B4', // SteelBlue, o el color que prefieras
+  },
   statusHighlightText: {
     color: 'white', // Texto blanco para contraste
     fontSize: 18,
     fontWeight: 'bold',
     textAlign: 'center',
+  },
+  teamEmblemStyle: {
+    width: 20, // Ajusta el tamaño según sea necesario
+    height: 20, // Ajusta el tamaño según sea necesario
+    resizeMode: 'contain',
+    marginRight: 8, // Espacio entre el emblema y el nombre del oponente
+    // Alineación vertical ya manejada por alignItems: 'center' en leftAndMiddleContainer
   },
 });

@@ -112,6 +112,12 @@ export default function MatchesScreen() {
       const savedSeason = await AsyncStorage.getItem(SEASON_STORAGE_KEY);
 
       for (const team of savedTeams) {
+        // Si el equipo es TierA, omitir el scrapeo de partidos para este equipo.
+        // Su información (nombre, emblema, tier) ya está guardada y se usará
+        // si aparece como equipoContrario en partidos de otros equipos.
+        if (team.tier === 'TierA') {
+          continue; // Saltar al siguiente equipo
+        }
         if (!team.originalUrl) {
           allScrapedMatches.push({
             Team: team.teamName || 'unknown_team_name_in_loop',

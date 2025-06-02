@@ -88,8 +88,10 @@ export default function TeamsScreen() {
           return;
         }
 
-        if (selectedTier === "World") {
+        // Para TierA y World, no necesitamos la información de la primera pestaña de navegación (liga/temporada)
+        if (selectedTier === "World" || selectedTier === "TierA") {
           scrapedData.firstNavLinkText = null;
+          scrapedData.firstNavLinkHref = null;
         }
 
         const teamWithTier: ScrapedTeamInfo = {

@@ -5,7 +5,32 @@ export interface OrganizedMatchInfo extends MatchDetails {
   formato?: string | null;
   Ronda?: string | null;
   Competicion?: string | null;
-  tier?: TeamTierType | null; // Add tier property
+  tier?: TeamTierType | null;
+  teamMainLeague?: string | null; // NUEVO: Para almacenar la liga principal del 'Team'
+  teamEmblemSrc?: string | null; // NUEVO: Para almacenar el emblema del 'Team'
+  opponentTier?: TeamTierType | null; // NUEVO: Tier del equipo contrario
+  opponentEmblemSrc?: string | null; // NUEVO: Emblema del equipo contrario
+  isMainLeagueCompetition?: boolean; // NUEVO: Indica si la competición es una liga principal
+}
+
+// Helper function to parse date strings (DD/MM/YYYY)
+function parseDate(dateStr: string | null | undefined): Date | null {
+  if (!dateStr) return null;
+  const parts = dateStr.split('/');
+  if (parts.length !== 3) return null;
+  const day = parseInt(parts[0], 10);
+  const month = parseInt(parts[1], 10) - 1; // JavaScript months are 0-indexed
+  const year = parseInt(parts[2], 10);
+  if (isNaN(day) || isNaN(month) || isNaN(year)) return null;
+  return new Date(year, month, day);
+}
+
+// Helper function to calculate difference in days between two dates
+function dateDiffInDays(date1: Date, date2: Date): number {
+  const _MS_PER_DAY = 1000 * 60 * 60 * 24;
+  const utc1 = Date.UTC(date1.getFullYear(), date1.getMonth(), date1.getDate());
+  const utc2 = Date.UTC(date2.getFullYear(), date2.getMonth(), date2.getDate());
+  return Math.floor((utc2 - utc1) / _MS_PER_DAY);
 }
 
 export function organizeMatchData(
@@ -123,16 +148,31 @@ export function organizeMatchData(
       finalHora = "FT";
     }
 
-    const teamTier = originalMatch.Team ? teamTierMap.get(originalMatch.Team) ?? null : null;
+    // Obtener tier y la liga principal (firstNavLinkText) del equipo del partido
+    const teamInfo = originalMatch.Team ? allSavedTeams.find(t => t.teamName === originalMatch.Team) : undefined;
+    const teamTier = teamInfo?.tier ?? null;
+    const mainLeagueForTeam = teamInfo?.firstNavLinkText ?? null;
+    const emblemForTeam = teamInfo?.teamEmblemSrc ?? null;
+
+    // Obtener tier y emblema del equipo contrario
+    const opponentName = originalMatch.equipoContrario;
+    const opponentInfo = opponentName ? allSavedTeams.find(t => t.teamName === opponentName) : undefined;
+    const tierForOpponent = opponentInfo?.tier ?? null;
+    const emblemForOpponent = opponentInfo?.teamEmblemSrc ?? null;
+    const isMainLeague = !!(competicionValue && savedTeamsFirstNavLinkTexts.includes(competicionValue));
 
     const processedMatch: OrganizedMatchInfo = {
       ...originalMatch,
-      // resultado se mantiene como el original
-      hora: finalHora, // Usar la hora modificada
+      hora: finalHora,
       Competicion: competicionValue,
       formato: null,
       Ronda: null,
-      tier: teamTier, // Assign the determined tier
+      tier: teamTier,
+      teamEmblemSrc: emblemForTeam, // Asignar el emblema del equipo
+      opponentTier: tierForOpponent, // Asignar tier del oponente
+      opponentEmblemSrc: emblemForOpponent, // Asignar emblema del oponente
+      teamMainLeague: mainLeagueForTeam, // Asignar la liga principal del equipo
+      isMainLeagueCompetition: isMainLeague, // Asignar si es competición de liga principal
     };
     if (
       originalMatch.week &&
@@ -226,7 +266,54 @@ export function organizeMatchData(
         return 0;
       }
     });
-    finalOrganizedMatches.push(...sortedTeamMatches);
+
+    // Insert "Parón Internacional" pseudo-matches
+    const matchesWithBreaks: OrganizedMatchInfo[] = [];
+    const teamInfoForPseudoMatch = allSavedTeams.find(t => t.teamName === currentTeamName);
+
+    for (let i = 0; i < sortedTeamMatches.length; i++) {
+      const currentMatch = sortedTeamMatches[i];
+      matchesWithBreaks.push(currentMatch); // Add the current match
+
+      // Check for a break after this match, if it's not the last match
+      if (currentMatch.Competicion !== "Amistoso" && (i + 1) < sortedTeamMatches.length) {
+        const nextMatch = sortedTeamMatches[i + 1];
+        if (nextMatch.Competicion !== "Amistoso") {
+          const dateCurrent = parseDate(currentMatch.fecha);
+          const dateNext = parseDate(nextMatch.fecha);
+
+          if (dateCurrent && dateNext) {
+            const diff = dateDiffInDays(dateCurrent, dateNext);
+            if (diff >= 12) {
+              const internationalBreakPseudoMatch: OrganizedMatchInfo = {
+                Team: currentTeamName,
+                Competicion: "Parón Internacional", // Special identifier
+                fecha: currentMatch.fecha, // Date of the match before the break
+                                           // This helps in ordering; display will be based on Competicion
+                hora: "---",
+                equipoContrario: "---", // Placeholder text
+                tier: teamInfoForPseudoMatch?.tier ?? null,
+                teamEmblemSrc: teamInfoForPseudoMatch?.teamEmblemSrc ?? null,
+                // Fill other fields with null or default values
+                week: null,
+                lugar: null,
+                resultado: null,
+                match: null,
+                error: null,
+                formato: null,
+                Ronda: null,
+                teamMainLeague: null,
+                opponentTier: null,
+                opponentEmblemSrc: null,
+                isMainLeagueCompetition: false,
+              };
+              matchesWithBreaks.push(internationalBreakPseudoMatch);
+            }
+          }
+        }
+      }
+    }
+    finalOrganizedMatches.push(...matchesWithBreaks);
   }
   return finalOrganizedMatches;
 }
