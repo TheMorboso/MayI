@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, Button, Platform, ActivityIndicator, Alert, ScrollView, Modal, TouchableOpacity, Text } from 'react-native';
+import { StyleSheet, View, Button, Platform, ActivityIndicator, Alert, ScrollView, Modal, TouchableOpacity } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from 'expo-router';
 
@@ -9,20 +9,16 @@ import { ScrapedTeamInfo } from '../../api/scraper';
 import { scrapeMatchDetails, MatchDetails } from '../../api/matchScraper';
 import { processPostScudettoData, PostScudettoMatchInfo } from '../../api/postscudetto';
 import { organizeMatchData, OrganizedMatchInfo } from '../../api/organizador';
-import { processPositiveNegative, PositiveNegativeTeamInfo } from '../../api/positivonegativo'; // Importar
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import { useColorScheme } from '@/hooks/useColorScheme';
-import { useIsFocused } from '@react-navigation/native';
 import { Colors } from '@/constants/Colors';
+import { useIsFocused } from '@react-navigation/native';
 
 export default function MatchesScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [matchesData, setMatchesData] = useState<MatchDetails[] | null>(null);
   const [organizedData, setOrganizedData] = useState<OrganizedMatchInfo[] | null>(null);
   const [postScudettoData, setPostScudettoData] = useState<PostScudettoMatchInfo[] | null>(null);
-  const [positiveNegativeData, setPositiveNegativeData] = useState<PositiveNegativeTeamInfo[] | null>(null);
-  const [isJsonModalVisible, setIsJsonModalVisible] = useState(false);
-  const [jsonToShow, setJsonToShow] = useState<'original' | 'organized' | 'postScudetto' | 'positiveNegative' | null>(null);
 
   const navigation = useNavigation();
   const colorScheme = useColorScheme();
@@ -30,43 +26,64 @@ export default function MatchesScreen() {
 
   const TEAMS_STORAGE_KEY = 'myTeams';
   const SEASON_STORAGE_KEY = 'currentSeason'; // Clave para la temporada guardada
+  const POST_SCUDETTO_DATA_KEY = 'postScudettoAllMatchData';
+  const [isPostScudettoJsonModalVisible, setIsPostScudettoJsonModalVisible] = useState(false);
 
   useEffect(() => {
     navigation.setOptions({
       headerRight: () => (
         <TouchableOpacity
           onPress={() => {
-            if (matchesData || organizedData || postScudettoData || positiveNegativeData) {
-              setIsJsonModalVisible(true);
+            if (postScudettoData) {
+              setIsPostScudettoJsonModalVisible(true);
             } else {
-              Alert.alert("Sin datos", "Primero realiza el scrapeo de partidos para ver el JSON.");
+              Alert.alert("Sin datos", "No hay datos Post Scudetto para mostrar. Realiza el scrapeo primero.");
             }
           }}
           style={{ marginRight: 15 }}
-          disabled={isLoading} // Deshabilitar si está cargando
-          // disabled={isLoading || (!matchesData && !organizedData && !postScudettoData && !positiveNegativeData)}
+          disabled={isLoading || !postScudettoData}
         >
           <IconSymbol name="doc.text.magnifyingglass" size={24} color={Colors[colorScheme ?? 'light'].tint} />
         </TouchableOpacity>
       ),
     });
-  }, [navigation, matchesData, organizedData, postScudettoData, positiveNegativeData, isLoading, colorScheme]);
-
+  }, [navigation, postScudettoData, isLoading, colorScheme]);
+  
   useEffect(() => {
     if (isFocused && !matchesData && !isLoading) {
       setOrganizedData(null);
       setPostScudettoData(null);
-      setPositiveNegativeData(null);
       handleFetchMatchDetails();
     }
   }, [isFocused, matchesData, isLoading]);
+
+  useEffect(() => {
+    const saveProcessedData = async () => {
+      // Avoid action if postScudettoData is undefined (e.g., initial state before any processing attempt)
+      if (typeof postScudettoData === 'undefined') return;
+
+      if (postScudettoData !== null) { // If there is data (even an empty array means data was processed)
+        try {
+          await AsyncStorage.setItem(POST_SCUDETTO_DATA_KEY, JSON.stringify(postScudettoData));
+        } catch (e) {
+          console.error("Failed to save PostScudettoData to AsyncStorage", e);
+        }
+      } else { // If postScudettoData is explicitly null (e.g. error, cleared, or no data after processing)
+        try {
+          await AsyncStorage.removeItem(POST_SCUDETTO_DATA_KEY);
+        } catch (e) {
+          console.error("Failed to remove PostScudettoData from AsyncStorage", e);
+        }
+      }
+    };
+    saveProcessedData();
+  }, [postScudettoData]);
 
   const handleFetchMatchDetails = async () => {
     setIsLoading(true);
     setMatchesData(null);
     setOrganizedData(null);
     setPostScudettoData(null);
-    setPositiveNegativeData(null);
 
     let currentSavedTeamsFirstNavLinkTexts: string[] = []; // Define here to be accessible in the whole function scope
 
@@ -145,29 +162,6 @@ export default function MatchesScreen() {
         if (currentOrganizedData && currentOrganizedData.length > 0) {
           await handleProcessPostScudetto(currentOrganizedData, currentSavedTeamsFirstNavLinkTexts);
         }
-
-        // Automatically process Positive/Negative for teams
-        try {
-          const teamsJsonForPN = await AsyncStorage.getItem(TEAMS_STORAGE_KEY);
-          if (teamsJsonForPN) {
-            const savedTeamsForPN: ScrapedTeamInfo[] = JSON.parse(teamsJsonForPN);
-            if (savedTeamsForPN.length > 0) {
-              const pnResult = processPositiveNegative(savedTeamsForPN);
-              setPositiveNegativeData(pnResult);
-              console.log("Procesamiento Positivo/Negativo automático completado.");
-            } else {
-              console.log("P/N: No hay equipos guardados para procesar.");
-              setPositiveNegativeData(null);
-            }
-          } else {
-            console.log("P/N: No se encontró TEAMS_STORAGE_KEY.");
-            setPositiveNegativeData(null);
-          }
-        } catch (pnError: any) {
-          console.error("Error en procesamiento Positivo/Negativo automático:", pnError);
-          // Alert.alert("Error P/N Automático", `Ocurrió un error: ${pnError.message || 'Error desconocido'}`);
-          setPositiveNegativeData(null);
-        }
       }
 
     } catch (error: any) {
@@ -175,7 +169,6 @@ export default function MatchesScreen() {
       setMatchesData([{ error: error.message, Team: 'general_error_context' }]);
       setOrganizedData(null);
       setPostScudettoData(null);
-      setPositiveNegativeData(null);
     } finally {
       setIsLoading(false);
     }
@@ -207,14 +200,14 @@ export default function MatchesScreen() {
         {!isLoading && matchesData && (
           <ThemedText style={styles.infoText} numberOfLines={3} ellipsizeMode="tail">
             {matchesData.some(match => match.error)
-              ? `Se encontraron errores durante el scrapeo. Presiona el ícono 🔎 para ver detalles.`
+              ? `Se encontraron errores durante el scrapeo.`
               : matchesData.length > 0
                 ? postScudettoData
-                  ? `Se obtuvieron, organizaron y procesaron (Post Scudetto) ${postScudettoData.length} partidos. Presiona el ícono 🔎 para ver JSON.`
+                  ? `Se obtuvieron, organizaron y procesaron (Post Scudetto) ${postScudettoData.length} partidos.`
                   : organizedData
                     ? `Se obtuvieron y organizaron ${organizedData.length} partidos. Procesando Post Scudetto...`
                     : `Se obtuvieron ${matchesData.length} partidos. Error en organización o sin datos para organizar.`
-              : `No se encontraron partidos. Presiona el ícono 🔎 para ver más detalles.`
+              : `No se encontraron partidos.`
             }
           </ThemedText>
         )}
@@ -223,10 +216,9 @@ export default function MatchesScreen() {
       <Modal
         animationType="slide"
         transparent={true}
-        visible={isJsonModalVisible}
+        visible={isPostScudettoJsonModalVisible}
         onRequestClose={() => {
-          setJsonToShow(null);
-          setIsJsonModalVisible(!isJsonModalVisible);
+          setIsPostScudettoJsonModalVisible(false);
         }}
       >
         <View style={styles.centeredView}>
@@ -235,51 +227,20 @@ export default function MatchesScreen() {
             { backgroundColor: colorScheme === 'dark' ? Colors.dark.background : Colors.light.background }
           ]}>
             <ThemedText type="subtitle" style={styles.modalTitle} numberOfLines={1} ellipsizeMode="tail">
-              {jsonToShow === 'original' && "JSON de Partidos Originales"}
-              {jsonToShow === 'organized' && "JSON de Partidos Organizados"}
-              {jsonToShow === 'postScudetto' && "JSON de Partidos Post Scudetto"}
-              {jsonToShow === 'positiveNegative' && "JSON Positivo/Negativo (Teams)"}
-              {!jsonToShow && "Seleccionar JSON para Visualizar"}
+              JSON de Partidos (Post Scudetto)
             </ThemedText>
-
-            <View style={styles.jsonSelectorContainer}>
-              {matchesData && (
-                <Button title="Original" onPress={() => setJsonToShow('original')} disabled={jsonToShow === 'original' || !matchesData} color={Colors[colorScheme ?? 'light'].tint}/>
-              )}
-              {organizedData && (
-                <Button title="Organizado" onPress={() => setJsonToShow('organized')} disabled={jsonToShow === 'organized' || !organizedData} color={Colors[colorScheme ?? 'light'].tint}/>
-              )}
-              {postScudettoData && (
-                <Button title="Post Scudetto" onPress={() => setJsonToShow('postScudetto')} disabled={jsonToShow === 'postScudetto' || !postScudettoData} color={Colors[colorScheme ?? 'light'].tint}/>
-              )}
-              {positiveNegativeData && (
-                <Button title="P/N Teams" onPress={() => setJsonToShow('positiveNegative')} disabled={jsonToShow === 'positiveNegative' || !positiveNegativeData} color={Colors[colorScheme ?? 'light'].tint}/>
-              )}
-            </View>
             
             <ScrollView style={styles.jsonScrollView}>
               <ThemedText style={styles.jsonText}>
-                {jsonToShow === 'original' && matchesData && JSON.stringify(matchesData, null, 2)}
-                {jsonToShow === 'organized' && organizedData && JSON.stringify(organizedData, null, 2)}
-                {jsonToShow === 'postScudetto' && postScudettoData && JSON.stringify(postScudettoData, null, 2)}
-                {jsonToShow === 'positiveNegative' && positiveNegativeData && JSON.stringify(positiveNegativeData, null, 2)}
-                {(!jsonToShow ||
-                  (jsonToShow === 'original' && !matchesData) ||
-                  (jsonToShow === 'organized' && !organizedData) ||
-                  (jsonToShow === 'postScudetto' && !postScudettoData)
-                  (jsonToShow === 'positiveNegative' && !positiveNegativeData)
-                  ) && (
-                    jsonToShow ? "Datos no disponibles para esta selección." : "Selecciona un tipo de JSON para visualizar."
-                  )
+                {postScudettoData 
+                  ? JSON.stringify(postScudettoData, null, 2) 
+                  : "Datos Post Scudetto no disponibles."
                 }
               </ThemedText>
             </ScrollView>
             <Button
               title="Cerrar"
-              onPress={() => {
-                setIsJsonModalVisible(false);
-                // setJsonToShow(null); // Optionally reset selection on close
-              }}
+              onPress={() => setIsPostScudettoJsonModalVisible(false)}
               color={Platform.OS === 'ios' ? Colors.light.tint : undefined}
             />
           </View>
@@ -316,28 +277,11 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     paddingHorizontal: 20,
   },
-  // buttonSpacing: { // No longer used
-  //   marginTop: 15,
-  // },
-  // detailItem, detailItemSmall, errorText are not used, consider removing
-  // detailItem: {
-  //   fontSize: 16,
-  //   marginBottom: 5,
-  // },
-  // detailItemSmall: {
-  //   fontSize: 12,
-  //   color: '#666',
-  //   marginBottom: 8,
-  // },
-  // errorText: {
-  //   color: 'red',
-  //   fontSize: 16,
-  // },
   centeredView: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.6)', // Darker overlay for better contrast
+    backgroundColor: 'rgba(0,0,0,0.6)', 
   },
   modalView: {
     margin: 20,
@@ -353,7 +297,7 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 5,
     width: '90%',
-    maxHeight: '80%', // Ensure modal doesn't take full screen height
+    maxHeight: '80%', 
   },
   modalTitle: {
     marginBottom: 15,
@@ -362,26 +306,13 @@ const styles = StyleSheet.create({
   jsonScrollView: {
     width: '100%',
     marginBottom: 20,
-    maxHeight: '70%', // Constrain scroll view height within modal
+    maxHeight: '70%', 
     // Consider adding a border or different background for the scroll view itself
     // borderColor: Colors.light.icon, // Example
     // borderWidth: 1, // Example
   },
   jsonText: {
     fontSize: 13,
-    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace', // Monospaced font for JSON
-  },
-  // actionSection: { // No longer used
-  //   marginTop: 20,
-  //   flexDirection: 'row',
-  //   alignItems: 'center',
-  // }
-  jsonSelectorContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    flexWrap: 'wrap',
-    marginBottom: 10,
-    width: '100%',
-    alignItems: 'center',
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace', 
   },
 });

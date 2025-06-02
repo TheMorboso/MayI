@@ -106,8 +106,15 @@ export function organizeMatchData(
       }
     }
 
+    // Modificar el resultado si no es "-:-"
+    let finalResultado = originalMatch.resultado;
+    if (originalMatch.resultado && originalMatch.resultado.trim() !== "-:-") {
+      finalResultado = "FT";
+    }
+
     const processedMatch: OrganizedMatchInfo = {
       ...originalMatch,
+      resultado: finalResultado, // Usar el resultado modificado
       Competicion: competicionValue,
       formato: null,
       Ronda: null,

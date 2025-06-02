@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, Modal, View, TextInput, Button, TouchableOpacity, Platform, FlatList, Image, ActivityIndicator, Alert } from 'react-native';
-import { useNavigation } from 'expo-router';
+import { useNavigation, useRouter } from 'expo-router';
 
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
@@ -21,6 +21,7 @@ export default function TeamsScreen() {
   const [isLoadingTeams, setIsLoadingTeams] = useState(true);
   const [selectedTier, setSelectedTier] = useState<TeamTier | null>(null);
   const navigation = useNavigation();
+  const router = useRouter();
   const colorScheme = useColorScheme();
   const isFocused = useIsFocused();
 
@@ -144,8 +145,23 @@ export default function TeamsScreen() {
     );
   };
 
+  const handlePressTeam = (team: ScrapedTeamInfo) => {
+    const teamRouteId = team.originalUrl;
+    const displayName = team.teamName;
+
+    if (teamRouteId) {
+      // Pass teamName as a query parameter for easy access and display on the next screen
+      router.push(`/team-matches/${encodeURIComponent(teamRouteId)}?teamName=${encodeURIComponent(displayName || 'Equipo Desconocido')}`);
+    } else {
+      Alert.alert("Error de Navegación", "No se puede mostrar los partidos, falta la URL original del equipo.");
+    }
+  };
+
   const renderTeamItem = ({ item }: { item: ScrapedTeamInfo }) => (
-    <TouchableOpacity onLongPress={() => handleDeleteTeam(item.originalUrl)} activeOpacity={0.7}>
+    <TouchableOpacity
+      onPress={() => handlePressTeam(item)} // Added onPress for navigation
+      onLongPress={() => handleDeleteTeam(item.originalUrl)} // Kept onLongPress for deletion
+      activeOpacity={0.7}>
       <ThemedView style={styles.teamItemContainer} lightColor="#f9f9f9" darkColor="#2C2C2E">
         {item.teamEmblemSrc ? (
           <Image source={{ uri: item.teamEmblemSrc }} style={styles.teamLogo} />

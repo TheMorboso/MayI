@@ -12,10 +12,19 @@ export function processPositiveNegative(
     return [];
   }
 
-  // Lógica de ejemplo:
-  // Reemplaza esto con tu lógica real.
-  return teams.map(team => ({
-    ...team,
-    positiveNegativeStatus: Math.random() > 0.5 ? 'Positivo' : 'Negativo', // Estado de ejemplo
-  }));
+  return teams.map(team => {
+    let status: 'Positivo' | 'Negativo' | 'Neutral' = 'Neutral';
+
+    if (team.error) {
+      status = 'Negativo';
+    } else if (team.teamName && team.teamEmblemSrc) {
+      // Consideramos 'Positivo' si no hay error y tenemos datos esenciales como nombre y emblema.
+      status = 'Positivo';
+    }
+    // Si no hay error pero falta teamName o teamEmblemSrc, se queda como 'Neutral'.
+    return {
+      ...team,
+      positiveNegativeStatus: status,
+    };
+  });
 }
