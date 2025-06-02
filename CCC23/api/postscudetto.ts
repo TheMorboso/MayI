@@ -3,8 +3,8 @@ import { OrganizedMatchInfo } from './organizador';
 export interface PostScudettoMatchInfo extends OrganizedMatchInfo {
   postScudettoProcessed?: boolean;
   puntos?: number; // Cumulative points for THIS team in THIS competition up to THIS match
-  // New field to describe the team's standing in the league after this match
-  Status?: 'Champion' | 'Can still win' | 'Cannot win' | 'Not a league match' | 'Data insufficient';
+  // Status describe la posición del equipo en la liga después de este partido, o un estado especial.
+  Status?: 'Champion' | 'Can still win' | 'Post scudetto' | 'Not a league match' | 'Data insufficient' | 'Negativo';
 
 }
 
@@ -15,7 +15,6 @@ export function processPostScudettoData(
   if (!organizedMatches || organizedMatches.length === 0) {
     return [];
   }
-  const anErrorOccurred = false; // This variable is declared but not used. Consider removing if not needed.
 
   // --- INICIO: Lógica para calcular y mostrar rondas totales por competición ---
   console.log("\n--- Rondas Totales por Competición de Liga ---");
@@ -55,7 +54,7 @@ export function processPostScudettoData(
   let processedData: PostScudettoMatchInfo[] = organizedMatches.map(match => {
     const postScudettoMatch: PostScudettoMatchInfo = {
       ...match,
-      Status: 'Not a league match', // Default value
+      Status: '', // Default value
     };
 
     if (
@@ -159,7 +158,7 @@ export function processPostScudettoData(
   processedData.forEach(matchA => {
     // Skip if not a league match relevant for this analysis or data is missing
     if (!matchA.Team || !matchA.Competicion || !matchA.Ronda || !roundsByCompetition.has(matchA.Competicion) || matchA.puntos === undefined) {
-      matchA.Status = matchA.Competicion && leagueCompetitionNames.includes(matchA.Competicion) ? 'Data insufficient' : 'Not a league match';
+      matchA.Status = matchA.Competicion && leagueCompetitionNames.includes(matchA.Competicion) ? 'Data insufficient' : '';
       return;
     }
 
@@ -221,7 +220,7 @@ export function processPostScudettoData(
       if (teamA_isChampion) {
         matchA.Status = 'Champion';
       } else {
-        matchA.Status = '';
+        matchA.Status = ''; // Estado por defecto si puede ganar pero no es campeón aún
       }
     }
   });

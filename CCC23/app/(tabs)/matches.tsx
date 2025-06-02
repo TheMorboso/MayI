@@ -8,6 +8,7 @@ import { ThemedText } from '@/components/ThemedText';
 import { ScrapedTeamInfo } from '../../api/scraper';
 import { scrapeMatchDetails, MatchDetails } from '../../api/matchScraper';
 import { processPostScudettoData, PostScudettoMatchInfo } from '../../api/postscudetto';
+import { processPositiveNegative } from '../../api/positivonegativo'; // Importar la nueva función
 import { organizeMatchData, OrganizedMatchInfo } from '../../api/organizador';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import { useColorScheme } from '@/hooks/useColorScheme';
@@ -141,7 +142,7 @@ export default function MatchesScreen() {
       if (allScrapedMatches && allScrapedMatches.length > 0 && !allScrapedMatches.some(m => m.error)) {
         try {
           // No need to re-fetch TEAMS_STORAGE_KEY, use currentSavedTeamsFirstNavLinkTexts
-          const processedData = organizeMatchData(allScrapedMatches, currentSavedTeamsFirstNavLinkTexts);
+          const processedData = organizeMatchData(allScrapedMatches, currentSavedTeamsFirstNavLinkTexts, savedTeams);
           setOrganizedData(processedData);
         } catch (orgError: any) {
           setPostScudettoData(null);
@@ -158,7 +159,7 @@ export default function MatchesScreen() {
         // Re-organize to ensure we have the latest data for PostScudetto, or use the state if confident
         // For robustness, re-organizing or ensuring organizedData state is up-to-date is good.
         // Here, we'll re-organize to pass the most current data directly.
-        const currentOrganizedData = organizeMatchData(allScrapedMatches, currentSavedTeamsFirstNavLinkTexts);
+        const currentOrganizedData = organizeMatchData(allScrapedMatches, currentSavedTeamsFirstNavLinkTexts, savedTeams);
         if (currentOrganizedData && currentOrganizedData.length > 0) {
           await handleProcessPostScudetto(currentOrganizedData, currentSavedTeamsFirstNavLinkTexts);
         }
@@ -185,7 +186,10 @@ export default function MatchesScreen() {
     setPostScudettoData(null);
     try {
       const finalData = processPostScudettoData(currentOrganizedData, leagueCompetitionNames);
-      setPostScudettoData(finalData);
+      // Aplicar el procesamiento adicional de positivonegativo.ts
+      const furtherProcessedData = processPositiveNegative(finalData, leagueCompetitionNames);
+      setPostScudettoData(furtherProcessedData);
+
     } catch (error: any) {
       Alert.alert("Error de Procesamiento Post Scudetto", error.message || "Ocurrió un error durante el procesamiento Post Scudetto.");
       setPostScudettoData(null);

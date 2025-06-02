@@ -67,12 +67,47 @@ export default function TeamMatchesScreen() {
     // Determinar el color del separador basado en el tema actual
     const separatorColor = colorScheme === 'dark' ? Colors.dark.text : Colors.light.text;
 
+    // Casos especiales para "Champion", "Post scudetto" y "Negativo"
+    if (item.Status === 'Champion') {
+      return (
+        <View style={[styles.matchItem, styles.statusHighlightItem, styles.championItem]}>
+          <ThemedText style={styles.statusHighlightText}>CAMPEÓN</ThemedText>
+        </View>
+      );
+    }
+
+    if (item.Status === 'Post scudetto') {
+      return (
+        <View style={[styles.matchItem, styles.statusHighlightItem, styles.postScudettoItem]}>
+          <ThemedText style={styles.statusHighlightText}>POST SCUDETTO</ThemedText>
+        </View>
+      );
+    }
+
+    if (item.Status === 'Negativo') {
+      return (
+        <View style={[styles.matchItem, styles.statusHighlightItem, styles.negativoItem]}>
+          <ThemedText style={styles.statusHighlightText}>NEGATIVO</ThemedText>
+        </View>
+      );
+    }
+
+    // Renderizado normal del partido si no es Champion ni Post Scudetto
+
     return (
       <>
         {showCompetitionHeader && (
-          <ThemedText style={styles.competitionHeader}>
-            {item.Competicion}
-          </ThemedText>
+          <View style={styles.competitionHeaderContainer}>
+            <ThemedText style={styles.competitionHeaderText}>
+              {item.Competicion}
+            </ThemedText>
+            {item.formato && item.formato.trim() !== '' && (
+              <ThemedText style={styles.competitionFormatText}>
+                {/* Capitalizamos la primera letra del formato */}
+                {` (${item.formato.charAt(0).toUpperCase() + item.formato.slice(1)})`}
+              </ThemedText>
+            )}
+          </View>
         )}
         <ThemedView style={styles.matchItem} lightColor="#f9f9f9" darkColor="#2C2C2E">
           <View style={styles.matchContentRow}>
@@ -94,10 +129,6 @@ export default function TeamMatchesScreen() {
               )}
             </View>
           </View>
-
-          {item.formato && item.formato.trim() !== '' && (
-            <ThemedText style={styles.detailTextSmall}>Formato: {item.formato}</ThemedText>
-          )}
         </ThemedView>
       </>
     );
@@ -172,13 +203,23 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginVertical: 15,
   },
-  competitionHeader: { 
-    fontSize: 16,
-    fontWeight: '600',
+  competitionHeaderContainer: { // Nuevo estilo para el contenedor de la competición y el formato
+    flexDirection: 'row',
+    alignItems: 'baseline', // Alinea bien textos de diferentes tamaños
     marginTop: 15,
     marginBottom: 5,
-    marginHorizontal: 5, 
-    paddingLeft: 10, 
+    marginHorizontal: 5,
+    paddingLeft: 10,
+  },
+  competitionHeaderText: { // Estilo para el texto de la competición
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  competitionFormatText: { // Estilo para el texto del formato
+    fontSize: 13,
+    fontWeight: '500',
+    opacity: 0.8,
+    marginLeft: 6, // Espacio entre la competición y el formato
   },
   matchItem: {
     paddingVertical: 10, 
@@ -236,15 +277,26 @@ const styles = StyleSheet.create({
     fontSize: 12, 
     fontWeight: 'bold',
   },
-  // statusTextSmall: { // Eliminado ya que no se usa más
-  //   fontSize: 10, 
-  //   opacity: 0.9,
-  //   marginTop: 2, 
-  //   fontWeight: '500',
-  // },
-  detailTextSmall: {
-    fontSize: 10, 
-    opacity: 0.7,
-    marginTop: 1, 
-  }
+  // Estilos para los items de estado especial
+  statusHighlightItem: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    height: 60, // Altura fija para estos items especiales, ajusta según necesidad
+    paddingVertical: 10, // Asegurar que el padding no interfiera con la altura
+  },
+  championItem: {
+    backgroundColor: 'red', // Fondo rojo para campeón
+  },
+  postScudettoItem: {
+    backgroundColor: 'darkred', // Un rojo más oscuro para post scudetto, o el mismo si prefieres
+  },
+  negativoItem: {
+    backgroundColor: '#8B0000', // Maroon, un rojo oscuro diferente para Negativo
+  },
+  statusHighlightText: {
+    color: 'white', // Texto blanco para contraste
+    fontSize: 18,
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
 });

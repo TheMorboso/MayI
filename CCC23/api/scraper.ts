@@ -1,5 +1,7 @@
 import * as cheerio from 'cheerio/slim';
 
+// Define TeamTierType based on TIER_OPTIONS in teams.tsx for consistency
+export type TeamTierType = "TierS" | "TierSred" | "TierA" | "TierC" | "Red" | "World";
 export interface ScrapedTeamInfo {
   originalUrl: string;
   teamEmblemSrc: string | null;
@@ -7,7 +9,7 @@ export interface ScrapedTeamInfo {
   teamName?: string | null;
   firstNavLinkHref?: string | null;
   error?: string;
-  tier?: "TierS" | "TierSred" | "TierA" | "TierC" | "Red" | null;
+  tier?: TeamTierType | null;
 }
 
 

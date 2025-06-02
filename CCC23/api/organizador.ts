@@ -1,18 +1,29 @@
 import { MatchDetails } from './matchScraper';
+import { ScrapedTeamInfo, TeamTierType } from './scraper'; // Import ScrapedTeamInfo and TeamTierType
 
 export interface OrganizedMatchInfo extends MatchDetails {
   formato?: string | null;
   Ronda?: string | null;
   Competicion?: string | null;
+  tier?: TeamTierType | null; // Add tier property
 }
 
 export function organizeMatchData(
   matches: MatchDetails[],
-  savedTeamsFirstNavLinkTexts: string[]
+  savedTeamsFirstNavLinkTexts: string[],
+  allSavedTeams: ScrapedTeamInfo[] // Add parameter to access all saved teams
 ): OrganizedMatchInfo[] {
   if (!matches || matches.length === 0) {
     return [];
   }
+
+  // Create a map for quick tier lookup by team name
+  const teamTierMap = new Map<string, TeamTierType | null>();
+  allSavedTeams.forEach(team => {
+    if (team.teamName) {
+      teamTierMap.set(team.teamName, team.tier ?? null);
+    }
+  });
 
   const matchesByTeam = new Map<string, OrganizedMatchInfo[]>();
   const teamNameOrder: string[] = [];
@@ -106,18 +117,22 @@ export function organizeMatchData(
       }
     }
 
-    // Modificar el resultado si no es "-:-"
-    let finalResultado = originalMatch.resultado;
+    // Modificar la hora si el resultado no es "-:-"
+    let finalHora = originalMatch.hora;
     if (originalMatch.resultado && originalMatch.resultado.trim() !== "-:-") {
-      finalResultado = "FT";
+      finalHora = "FT";
     }
+
+    const teamTier = originalMatch.Team ? teamTierMap.get(originalMatch.Team) ?? null : null;
 
     const processedMatch: OrganizedMatchInfo = {
       ...originalMatch,
-      resultado: finalResultado, // Usar el resultado modificado
+      // resultado se mantiene como el original
+      hora: finalHora, // Usar la hora modificada
       Competicion: competicionValue,
       formato: null,
       Ronda: null,
+      tier: teamTier, // Assign the determined tier
     };
     if (
       originalMatch.week &&
