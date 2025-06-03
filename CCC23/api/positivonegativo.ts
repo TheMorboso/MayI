@@ -127,7 +127,10 @@ export function processPositiveNegative(
 
             // Si la ronda anterior es mayor que la ronda actual (ej. prev: 26, current: 15)
             if (!isNaN(prevRondaNum) && prevRondaNum > currentRondaNum) {
-              updatedMatch.Status = "Negativo";
+              // No aplicar esta regla de "Negativo" si el equipo contrario es TierS
+              if (updatedMatch.opponentTier !== "TierS") {
+                updatedMatch.Status = "Negativo";
+              }
             }
             // Encontramos el partido de liga anterior relevante, no necesitamos seguir buscando hacia atrás para este updatedMatch
             break; 
@@ -135,6 +138,45 @@ export function processPositiveNegative(
         }
       }
     }
+
+    // NUEVAS REGLAS ESPECIALES PARA PREMIER LEAGUE
+    const PREMIER_LEAGUE_COMPETITION_NAME = "Premier League"; // Asegúrate que este string coincida con el usado en organizador.ts
+
+    if (updatedMatch.Competicion === PREMIER_LEAGUE_COMPETITION_NAME && updatedMatch.Team) {
+      // Solo aplicar estas reglas si el Status actual no es Champion o Post scudetto
+      if (updatedMatch.Status !== "Champion" && updatedMatch.Status !== "Post scudetto") {
+        let prevMatchOfSameTeam: PostScudettoMatchInfo | null = null;
+        for (let i = index - 1; i >= 0; i--) {
+          if (allMatchesArray[i].Team === updatedMatch.Team) {
+            prevMatchOfSameTeam = allMatchesArray[i];
+            break;
+          }
+        }
+
+        let nextMatchOfSameTeam: PostScudettoMatchInfo | null = null;
+        for (let i = index + 1; i < allMatchesArray.length; i++) {
+          if (allMatchesArray[i].Team === updatedMatch.Team) {
+            nextMatchOfSameTeam = allMatchesArray[i];
+            break;
+          }
+        }
+
+        // Regla 1: Partido de Premier League entre dos partidos de "Competicion"
+        if (
+          prevMatchOfSameTeam && prevMatchOfSameTeam.Competicion === "Competicion" &&
+          nextMatchOfSameTeam && nextMatchOfSameTeam.Competicion === "Competicion"
+        ) {
+          updatedMatch.Status = "Negativo";
+        }
+
+        // Regla 2: Partido de Premier League después de un "Parón Internacional"
+        // Esta regla se evalúa incluso si la Regla 1 ya aplicó "Negativo".
+        if (prevMatchOfSameTeam && prevMatchOfSameTeam.Competicion === "Parón Internacional") {
+          updatedMatch.Status = "Negativo";
+        }
+      }
+    }
+
     return updatedMatch; // Devolver el partido (modificado o no)
   });
 }
