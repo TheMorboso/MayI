@@ -12,13 +12,18 @@ export function processPositiveNegative(
     const updatedMatch = { ...currentMatch }; // Clonar el partido actual
 
     // Lógica para partidos de "Competencia"
-    if (updatedMatch.Competicion === "Competencia" && updatedMatch.Team) {
-      // Si el tier del equipo NO es "TierS", se establece el Status como "Negativo".
-      // Esto incluye tiers como "TierSred", "TierA", "TierC", "Red", "World", o si el tier es null/undefined.
-      if (updatedMatch.tier !== "TierS") {
+    // Aplicar esta lógica si Competicion es "Competencia" (con 'e') O "Competicion" (con 'o')
+    if ((updatedMatch.Competicion === "Competencia" || updatedMatch.Competicion === "Competicion") && updatedMatch.Team) {
+      if (updatedMatch.tier === "TierSred") {
+        if (updatedMatch.opponentTier !== "TierS") {
+          updatedMatch.Status = "Negativo";
+        }
+      }
+      // Regla existente: Si el tier del equipo NO es TierS ni TierSred, es Negativo.
+      else if (updatedMatch.tier !== "TierS") { // Esto cubre TierA, TierC, Red, World, null/undefined
         updatedMatch.Status = "Negativo";
       } else {
-        // Lógica original (ahora se aplica solo a equipos "TierS" para partidos de "Competencia")
+        // Lógica existente: Si el equipo es TierS, aplicar la regla de partidos adyacentes "Post scudetto".
         // Busca el partido anterior y siguiente del mismo equipo para verificar su Status.
         let prevMatchOfSameTeam: PostScudettoMatchInfo | null = null;
         for (let i = index - 1; i >= 0; i--) { // Usar allMatchesArray
@@ -36,8 +41,8 @@ export function processPositiveNegative(
           }
         }
 
-        // Si ambos partidos adyacentes (del mismo equipo) tienen Status "Post scudetto",
-        // el partido actual "Competencia" (para el equipo TierS) se marca como "Negativo".
+        // Si ambos partidos adyacentes (del mismo equipo TierS) tienen Status "Post scudetto",
+        // el partido actual "Competencia" se marca como "Negativo".
         if (prevMatchOfSameTeam && prevMatchOfSameTeam.Status === "Post scudetto" &&
             nextMatchOfSameTeam && nextMatchOfSameTeam.Status === "Post scudetto") {
           updatedMatch.Status = "Negativo";

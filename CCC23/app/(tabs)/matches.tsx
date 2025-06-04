@@ -7,6 +7,7 @@ import { ThemedView } from '@/components/ThemedView';
 import { ThemedText } from '@/components/ThemedText';
 import { ScrapedTeamInfo } from '../../api/scraper';
 import { scrapeMatchDetails, MatchDetails } from '../../api/matchScraper';
+import { applyCorrections } from '../../api/correcciones'; // Importar la nueva función
 import { processPostScudettoData, PostScudettoMatchInfo } from '../../api/postscudetto';
 import { processPositiveNegative } from '../../api/positivonegativo'; // Importar la nueva función
 import { organizeMatchData, OrganizedMatchInfo } from '../../api/organizador';
@@ -20,7 +21,6 @@ export default function MatchesScreen() {
   const [matchesData, setMatchesData] = useState<MatchDetails[] | null>(null);
   const [organizedData, setOrganizedData] = useState<OrganizedMatchInfo[] | null>(null);
   const [postScudettoData, setPostScudettoData] = useState<PostScudettoMatchInfo[] | null>(null);
-
   const navigation = useNavigation();
   const colorScheme = useColorScheme();
   const isFocused = useIsFocused();
@@ -193,8 +193,10 @@ export default function MatchesScreen() {
     try {
       const finalData = processPostScudettoData(currentOrganizedData, leagueCompetitionNames);
       // Aplicar el procesamiento adicional de positivonegativo.ts
-      const furtherProcessedData = processPositiveNegative(finalData, leagueCompetitionNames);
-      setPostScudettoData(furtherProcessedData);
+      const dataAfterPositiveNegative = processPositiveNegative(finalData, leagueCompetitionNames);
+      // Aplicar las correcciones personalizadas
+      const correctedData = applyCorrections(dataAfterPositiveNegative);
+      setPostScudettoData(correctedData);
 
     } catch (error: any) {
       Alert.alert("Error de Procesamiento Post Scudetto", error.message || "Ocurrió un error durante el procesamiento Post Scudetto.");
