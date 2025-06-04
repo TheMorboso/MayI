@@ -45,6 +45,36 @@ export function processPositiveNegative(
       }
     }
 
+    // NUEVA REGLA: Partido de "Competicion" (Champions/Europa League, etc.) entre dos partidos con Status "Post scudetto"
+    // Esta regla SOLO aplica a equipos TierS.
+    if (updatedMatch.Competicion === "Competicion" && updatedMatch.Team && updatedMatch.tier === "TierS") {
+      // Solo aplicar si el Status actual no es Champion o Post scudetto
+      if (updatedMatch.Status !== "Champion" && updatedMatch.Status !== "Post scudetto") {
+        let prevMatchOfSameTeam: PostScudettoMatchInfo | null = null;
+        // Buscar el partido inmediatamente anterior del mismo equipo
+        for (let i = index - 1; i >= 0; i--) {
+          if (allMatchesArray[i].Team === updatedMatch.Team) {
+            prevMatchOfSameTeam = allMatchesArray[i];
+            break; // Encontramos el partido anterior más reciente del mismo equipo
+          }
+        }
+
+        let nextMatchOfSameTeam: PostScudettoMatchInfo | null = null;
+        // Buscar el partido inmediatamente siguiente del mismo equipo
+        for (let i = index + 1; i < allMatchesArray.length; i++) {
+          if (allMatchesArray[i].Team === updatedMatch.Team) {
+            nextMatchOfSameTeam = allMatchesArray[i];
+            break; // Encontramos el partido siguiente más cercano del mismo equipo
+          }
+        }
+
+        if (prevMatchOfSameTeam && prevMatchOfSameTeam.Status === "Post scudetto" &&
+            nextMatchOfSameTeam && nextMatchOfSameTeam.Status === "Post scudetto") {
+          updatedMatch.Status = "Negativo";
+        }
+      }
+    }
+
     // Lógicas para partidos de "Amistoso"
     if (updatedMatch.Competicion === "Amistoso" && updatedMatch.Team) {
       // Regla 1: Si el tier del equipo NO es "TierS"
@@ -135,6 +165,64 @@ export function processPositiveNegative(
             // Encontramos el partido de liga anterior relevante, no necesitamos seguir buscando hacia atrás para este updatedMatch
             break; 
           }
+        }
+      }
+    }
+
+    // NUEVA REGLA: Partidos de liga principal precedidos por un partido de "Competicion" con "aet"
+    if (updatedMatch.Team &&
+        updatedMatch.Competicion &&
+        savedTeamsFirstNavLinkTexts.includes(updatedMatch.Competicion)) {
+
+      // Solo aplicar si el Status actual no es Champion o Post scudetto
+      if (updatedMatch.Status !== "Champion" && updatedMatch.Status !== "Post scudetto") {
+        let prevMatchOfSameTeam: PostScudettoMatchInfo | null = null;
+        // Buscar el partido inmediatamente anterior del mismo equipo
+        for (let i = index - 1; i >= 0; i--) {
+          if (allMatchesArray[i].Team === updatedMatch.Team) {
+            prevMatchOfSameTeam = allMatchesArray[i];
+            break; // Encontramos el partido anterior más reciente del mismo equipo
+          }
+        }
+
+        if (prevMatchOfSameTeam &&
+            prevMatchOfSameTeam.Competicion === "Competicion" &&
+            prevMatchOfSameTeam.resultado &&
+            prevMatchOfSameTeam.resultado.includes("aet")) {
+          
+          updatedMatch.Status = "Negativo";
+        }
+      }
+    }
+
+
+    // NUEVA REGLA: Partido de liga ("A") entre dos partidos de "Competicion" ("A")
+    if (updatedMatch.Team &&
+        updatedMatch.Competicion &&
+        savedTeamsFirstNavLinkTexts.includes(updatedMatch.Competicion) &&
+        updatedMatch.lugar === "A") {
+
+      // Solo aplicar si el Status actual no es Champion o Post scudetto
+      if (updatedMatch.Status !== "Champion" && updatedMatch.Status !== "Post scudetto") {
+        let prevMatchOfSameTeam: PostScudettoMatchInfo | null = null;
+        for (let i = index - 1; i >= 0; i--) {
+          if (allMatchesArray[i].Team === updatedMatch.Team) {
+            prevMatchOfSameTeam = allMatchesArray[i];
+            break;
+          }
+        }
+
+        let nextMatchOfSameTeam: PostScudettoMatchInfo | null = null;
+        for (let i = index + 1; i < allMatchesArray.length; i++) {
+          if (allMatchesArray[i].Team === updatedMatch.Team) {
+            nextMatchOfSameTeam = allMatchesArray[i];
+            break;
+          }
+        }
+
+        if (prevMatchOfSameTeam && prevMatchOfSameTeam.Competicion === "Competicion" && prevMatchOfSameTeam.lugar === "A" &&
+            nextMatchOfSameTeam && nextMatchOfSameTeam.Competicion === "Competicion" && nextMatchOfSameTeam.lugar === "A") {
+          updatedMatch.Status = "Negativo";
         }
       }
     }
