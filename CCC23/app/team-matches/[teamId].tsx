@@ -73,27 +73,35 @@ export default function TeamMatchesScreen() {
       opponentDisplayName = 'TierD';
     }
 
+    const isWorldWorldCompeticionPairWithNegativeStatus =
+      item.tier === "World" &&
+      item.opponentTier === "World" &&
+      item.Competicion === "Competicion" && // Asumimos que correcciones.ts ya cambió null a "Competicion"
+      item.Status === "Negativo";
+
     // Casos especiales para "Champion", "Post scudetto" y "Negativo"
-    if (item.Status === 'Champion') {
-      return (
-        <View style={[styles.matchItem, styles.statusHighlightItem, styles.championItem]}>
-          <ThemedText style={styles.statusHighlightText}>CAMPEÓN</ThemedText>
-        </View>
-      );
-    }
+    // y "Parón Internacional"
+    if (
+      item.Competicion === 'Parón Internacional' ||
+      item.Status === 'Champion' ||
+      item.Status === 'Post scudetto' ||
+      (item.Status === 'Negativo' && !isWorldWorldCompeticionPairWithNegativeStatus)
+    ) {
+      let specialStyle = {};
+      let text = '';
 
-    if (item.Status === 'Post scudetto') {
+      if (item.Competicion === 'Parón Internacional') {
+        specialStyle = styles.internationalBreakItem; text = 'PARÓN INTERNACIONAL';
+      } else if (item.Status === 'Champion') {
+        specialStyle = styles.championItem; text = 'CAMPEÓN';
+      } else if (item.Status === 'Post scudetto') {
+        specialStyle = styles.postScudettoItem; text = 'POST SCUDETTO';
+      } else if (item.Status === 'Negativo') { // Solo se alcanza si !isWorldWorldCompeticionPairWithNegativeStatus
+        specialStyle = styles.negativoItem; text = 'NEGATIVO';
+      }
       return (
-        <View style={[styles.matchItem, styles.statusHighlightItem, styles.postScudettoItem]}>
-          <ThemedText style={styles.statusHighlightText}>POST SCUDETTO</ThemedText>
-        </View>
-      );
-    }
-
-    if (item.Status === 'Negativo') {
-      return (
-        <View style={[styles.matchItem, styles.statusHighlightItem, styles.negativoItem]}>
-          <ThemedText style={styles.statusHighlightText}>NEGATIVO</ThemedText>
+        <View style={[styles.matchItem, styles.statusHighlightItem, specialStyle]}>
+          <ThemedText style={styles.statusHighlightText}>{text}</ThemedText>
         </View>
       );
     }
@@ -101,14 +109,10 @@ export default function TeamMatchesScreen() {
     // NUEVO: Manejar "Parón Internacional"
     // Este chequeo debe ir ANTES del renderizado normal del partido.
     if (item.Competicion === 'Parón Internacional') {
-      return (
-        <View style={[styles.matchItem, styles.statusHighlightItem, styles.internationalBreakItem]}>
-          <ThemedText style={styles.statusHighlightText}>PARÓN INTERNACIONAL</ThemedText>
-        </View>
-      );
+      // Ya manejado arriba, este bloque no debería alcanzarse si la lógica es correcta.
+      // Se podría remover o dejar como un fallback si se prefiere.
     }
-    // Renderizado normal del partido si no es Champion ni Post Scudetto
-
+    // Renderizado normal del partido
     return (
       <>
         {showCompetitionHeader && (

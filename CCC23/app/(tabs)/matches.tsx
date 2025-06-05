@@ -82,16 +82,55 @@ export default function MatchesScreen() {
       }
     } else if (postScudettoData && postScudettoData.length > 0) {
       const formattedSelectedDate = dateToDDMMYYYY(selectedDate);
-      const matchesForDate = postScudettoData.filter(
+      
+      // Obtener todos los partidos para la fecha que no sean "Parón Internacional"
+      const rawMatchesForDate = postScudettoData.filter(
         match => match.fecha === formattedSelectedDate && match.Competicion !== "Parón Internacional"
       );
-      setFilteredDailyMatches(matchesForDate);
+
+      const finalFilteredMatches: PostScudettoMatchInfo[] = [];
+      const dailyProcessedPairKeys = new Set<string>(); // Para rastrear pares ya procesados en la UI del día
+
+      for (const match of rawMatchesForDate) {
+        let isSpecialPairWithNegativeStatus = false;
+        let pairKey: string | null = null;
+
+        // Identificar si es un partido de par especial (TierS/Sred o World/World en Competicion)
+        // Y si su Status es "Negativo", indicando que fue procesado por applyCorrections para ser unificado en la UI.
+        if (match.Competicion === "Competicion" && match.Team && match.equipoContrario) {
+          const isTierSPair = (match.tier === "TierS" || match.tier === "TierSred") &&
+                              (match.opponentTier === "TierS" || match.opponentTier === "TierSred");
+          const isWorldPair = match.tier === "World" && match.opponentTier === "World";
+
+          if ((isTierSPair || isWorldPair) && match.Status === "Negativo") {
+            isSpecialPairWithNegativeStatus = true;
+            const team1 = match.Team;
+            const team2 = match.equipoContrario;
+            const sortedTeams = [team1, team2].sort();
+            // Usar una clave consistente para identificar el par. La fecha ya está filtrada.
+            pairKey = `${match.fecha}-${sortedTeams[0]}-${sortedTeams[1]}-${match.Competicion}`;
+          }
+        }
+
+        if (isSpecialPairWithNegativeStatus && pairKey) {
+          if (dailyProcessedPairKeys.has(pairKey)) {
+            // Si este par (con Status="Negativo") ya fue añadido, saltar este (que sería el duplicado)
+            continue;
+          }
+          dailyProcessedPairKeys.add(pairKey);
+          finalFilteredMatches.push(match); // Añadir la primera instancia del par "Negativo"
+        } else {
+          // Para todos los demás partidos (no especiales, o especiales pero no "Negativo", etc.)
+          finalFilteredMatches.push(match);
+        }
+      }
+      setFilteredDailyMatches(finalFilteredMatches);
 
       if (isDailyJsonScrollViewVisible) {
-        if (matchesForDate.length > 0) {
-          setDailyMatchesJson(JSON.stringify(matchesForDate, null, 2));
+        if (finalFilteredMatches.length > 0) { // Usar finalFilteredMatches para el JSON también
+          setDailyMatchesJson(JSON.stringify(finalFilteredMatches, null, 2));
         } else {
-          setDailyMatchesJson(`No hay partidos para el ${formattedSelectedDate}.`);
+          setDailyMatchesJson(`No hay partidos para el ${formattedSelectedDate} (después de filtrar duplicados).`);
         }
       }
     } else { // No hay postScudettoData o está vacío (y no está cargando)
@@ -239,19 +278,31 @@ export default function MatchesScreen() {
       opponentDisplayName = 'TierD';
     }
 
-    // Esta condición ahora es manejada por el filtro en el useEffect,
-    // por lo que los items de "Parón Internacional" no deberían llegar aquí.
-    // Se mantiene por si acaso o para otros usos.
-    if (item.Status === 'Champion' || item.Status === 'Post scudetto' || item.Status === 'Negativo' || item.Competicion === 'Parón Internacional') {
+    const isWorldWorldCompeticionPairWithNegativeStatus =
+      item.tier === "World" &&
+      item.opponentTier === "World" &&
+      item.Competicion === "Competicion" &&
+      item.Status === "Negativo";
+
+    // Condición para renderizar como un item de estado especial (Champion, Post Scudetto, Parón Internacional,
+    // o Negativo para casos que NO sean World/World en Competicion que queremos renderizar normalmente).
+    // Los items de "Parón Internacional" no deberían llegar aquí debido al filtro en useEffect, pero se mantiene la lógica.
+    if (
+      item.Competicion === 'Parón Internacional' ||
+      item.Status === 'Champion' ||
+      item.Status === 'Post scudetto' ||
+      (item.Status === 'Negativo' && !isWorldWorldCompeticionPairWithNegativeStatus)
+    ) {
       let specialStyle = {};
       let text = '';
-      if (item.Competicion === 'Parón Internacional') { // No debería mostrarse
+      if (item.Competicion === 'Parón Internacional') {
         specialStyle = styles.internationalBreakItem; text = 'PARÓN INTERNACIONAL';
       } else {
         switch (item.Status) {
           case 'Champion': specialStyle = styles.championItem; text = 'CAMPEÓN'; break;
           case 'Post scudetto': specialStyle = styles.postScudettoItem; text = 'POST SCUDETTO'; break;
-          case 'Negativo': specialStyle = styles.negativoItem; text = 'NEGATIVO'; break;
+          case 'Negativo': // Este caso solo se alcanza si !isWorldWorldCompeticionPairWithNegativeStatus
+            specialStyle = styles.negativoItem; text = 'NEGATIVO'; break;
         }
       }
       return (
@@ -260,7 +311,8 @@ export default function MatchesScreen() {
         </View>
       );
     }
-
+    // Si llegamos aquí, es un partido normal O un World/World en Competicion con Status="Negativo"
+    // (que queremos renderizar normalmente, y la lógica de deduplicación ya manejó que solo aparezca una vez).
     return (
       <ThemedView style={styles.dailyMatchItemContainer} lightColor="#f9f9f9" darkColor="#2C2C2E">
         <View style={styles.matchHeaderRow}>

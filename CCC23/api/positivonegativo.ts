@@ -11,12 +11,24 @@ export function processPositiveNegative(
   return matches.map((currentMatch, index, allMatchesArray) => {
     const updatedMatch = { ...currentMatch }; // Clonar el partido actual
 
+    // NUEVA REGLA: TierSred vs TierSred siempre es "Negativo"
+    if (updatedMatch.tier === "TierSred" && updatedMatch.opponentTier === "TierSred") {
+      updatedMatch.Status = "Negativo";
+    }
+
     // Lógica para partidos de "Competencia"
     // Aplicar esta lógica si Competicion es "Competencia" (con 'e') O "Competicion" (con 'o')
     if ((updatedMatch.Competicion === "Competencia" || updatedMatch.Competicion === "Competicion") && updatedMatch.Team) {
       if (updatedMatch.tier === "TierSred") {
-        if (updatedMatch.opponentTier !== "TierS") {
+        // Si ya se estableció como "Negativo" por TierSred vs TierSred, no sobrescribir a menos que sea vs TierS
+        if (updatedMatch.opponentTier !== "TierS" && updatedMatch.Status !== "Negativo") {
           updatedMatch.Status = "Negativo";
+        } else if (updatedMatch.opponentTier === "TierS" && updatedMatch.Status === "Negativo" && updatedMatch.opponentTier === "TierSred") {
+          // Este caso es TierSred vs TierSred, ya manejado arriba.
+          // Si es TierSred vs TierS, y el status ya es Negativo (por TierSred vs TierSred), no hacer nada.
+          // Si es TierSred vs TierS, y el status NO es Negativo, se evaluará más adelante si es necesario.
+        } else if (updatedMatch.opponentTier !== "TierS") { // Si no es vs TierS, y no fue TierSred vs TierSred
+            updatedMatch.Status = "Negativo";
         }
       }
       // Regla existente: Si el tier del equipo NO es TierS ni TierSred, es Negativo.
