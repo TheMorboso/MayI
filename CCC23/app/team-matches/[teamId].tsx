@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { FlatList, ActivityIndicator, StyleSheet, View, Image } from 'react-native'; // Importar Image
-import { useLocalSearchParams, Stack } from 'expo-router';
+import { FlatList, ActivityIndicator, StyleSheet, View, Image, TouchableOpacity, Alert } from 'react-native'; // Importar Image, TouchableOpacity, Alert
+import { useLocalSearchParams, Stack, useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { PostScudettoMatchInfo } from '@/api/postscudetto';
@@ -12,6 +12,7 @@ const POST_SCUDETTO_DATA_KEY = 'postScudettoAllMatchData'; // Debe coincidir con
 export default function TeamMatchesScreen() {
   const params = useLocalSearchParams<{ teamId: string; teamName?: string }>();
   const { teamId: encodedTeamId, teamName: encodedTeamNameFromQuery } = params;
+  const router = useRouter();
 
   const teamId = encodedTeamId ? decodeURIComponent(encodedTeamId) : undefined;
   const teamNameForDisplay = encodedTeamNameFromQuery ? decodeURIComponent(encodedTeamNameFromQuery) : 'Equipo Desconocido';
@@ -54,6 +55,19 @@ export default function TeamMatchesScreen() {
 
     loadMatches();
   }, [teamId, teamNameForFilter]);
+
+  const handlePressMatchItem = (matchItem: PostScudettoMatchInfo) => {
+    if (matchItem.match && matchItem.match.trim() !== '') {
+      const matchIdentifier = `${matchItem.Team || 'Equipo'} vs ${matchItem.equipoContrario || 'Oponente'} (${matchItem.fecha})`;
+      router.push({
+        pathname: `/match-analysis`,
+        params: { matchUrl: encodeURIComponent(matchItem.match), matchIdentifier: encodeURIComponent(matchIdentifier) },
+      });
+    } else {
+      Alert.alert("Sin Enlace", "Este partido no tiene un enlace de detalles para analizar.");
+    }
+  };
+
 
   const renderMatchItemRevised = ({ item, index }: { item: PostScudettoMatchInfo, index: number }) => {
     const prevItem = teamMatches[index - 1];
@@ -100,9 +114,11 @@ export default function TeamMatchesScreen() {
         specialStyle = styles.negativoItem; text = 'NEGATIVO';
       }
       return (
-        <View style={[styles.matchItem, styles.statusHighlightItem, specialStyle]}>
-          <ThemedText style={styles.statusHighlightText}>{text}</ThemedText>
-        </View>
+        <TouchableOpacity onPress={() => handlePressMatchItem(item)} activeOpacity={item.match ? 0.7 : 1}>
+          <View style={[styles.matchItem, styles.statusHighlightItem, specialStyle]}>
+            <ThemedText style={styles.statusHighlightText}>{text}</ThemedText>
+          </View>
+        </TouchableOpacity>
       );
     }
 
@@ -114,49 +130,51 @@ export default function TeamMatchesScreen() {
     }
     // Renderizado normal del partido
     return (
-      <>
-        {showCompetitionHeader && (
-          <View style={styles.competitionHeaderContainer}>
-            <ThemedText style={styles.competitionHeaderText}>
-              {item.Competicion}
-            </ThemedText>
-            {item.formato && item.formato.trim() !== '' && (
-              <ThemedText style={styles.competitionFormatText}>
-                {/* Capitalizamos la primera letra del formato */}
-                {` (${item.formato.charAt(0).toUpperCase() + item.formato.slice(1)})`}
+      <TouchableOpacity onPress={() => handlePressMatchItem(item)} activeOpacity={item.match ? 0.7 : 1}>
+        <>
+          {showCompetitionHeader && (
+            <View style={styles.competitionHeaderContainer}>
+              <ThemedText style={styles.competitionHeaderText}>
+                {item.Competicion}
               </ThemedText>
-            )}
-          </View>
-        )}
-        <ThemedView style={styles.matchItem} lightColor="#f9f9f9" darkColor="#2C2C2E">
-          <View style={styles.matchContentRow}>
-            <View style={styles.leftAndMiddleContainer}>
-              <View style={styles.dateTimeContainer}>
-                <ThemedText style={styles.matchDateSmall}>{item.fecha || 'Fecha N/A'}</ThemedText>
-                {item.hora && <ThemedText style={styles.matchTimeSmall}>{item.hora}</ThemedText>}
+              {item.formato && item.formato.trim() !== '' && (
+                <ThemedText style={styles.competitionFormatText}>
+                  {/* Capitalizamos la primera letra del formato */}
+                  {` (${item.formato.charAt(0).toUpperCase() + item.formato.slice(1)})`}
+                </ThemedText>
+              )}
+            </View>
+          )}
+          <ThemedView style={styles.matchItem} lightColor="#f9f9f9" darkColor="#2C2C2E">
+            <View style={styles.matchContentRow}>
+              <View style={styles.leftAndMiddleContainer}>
+                <View style={styles.dateTimeContainer}>
+                  <ThemedText style={styles.matchDateSmall}>{item.fecha || 'Fecha N/A'}</ThemedText>
+                  {item.hora && <ThemedText style={styles.matchTimeSmall}>{item.hora}</ThemedText>}
+                </View>
+                <View style={styles.verticalSeparator} />
+                {shouldShowOpponentEmblem && ( // Condición basada en el oponente
+                  <Image
+                    source={{ uri: item.opponentEmblemSrc! }} // Usar el emblema del oponente
+                    style={styles.teamEmblemStyle} // El estilo puede ser el mismo
+                  />
+                )}
+                <ThemedText 
+                  style={styles.matchOpponentSmall} // Se ajustará el estilo abajo
+                  numberOfLines={2} ellipsizeMode="tail">
+                  {opponentDisplayName}
+                </ThemedText>
               </View>
-              <View style={styles.verticalSeparator} />
-              {shouldShowOpponentEmblem && ( // Condición basada en el oponente
-                <Image
-                  source={{ uri: item.opponentEmblemSrc! }} // Usar el emblema del oponente
-                  style={styles.teamEmblemStyle} // El estilo puede ser el mismo
-                />
-              )}
-              <ThemedText 
-                style={styles.matchOpponentSmall} // Se ajustará el estilo abajo
-                numberOfLines={2} ellipsizeMode="tail">
-                {opponentDisplayName}
-              </ThemedText>
-            </View>
 
-            <View style={styles.locationContainer}>
-              {item.lugar && ['H', 'A', 'N'].includes(item.lugar) && (
-                <ThemedText style={styles.locationText}>{item.lugar}</ThemedText>
-              )}
+              <View style={styles.locationContainer}>
+                {item.lugar && ['H', 'A', 'N'].includes(item.lugar) && (
+                  <ThemedText style={styles.locationText}>{item.lugar}</ThemedText>
+                )}
+              </View>
             </View>
-          </View>
-        </ThemedView>
-      </>
+          </ThemedView>
+        </>
+      </TouchableOpacity>
     );
   };
 

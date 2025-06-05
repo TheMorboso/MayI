@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, Button, Platform, ActivityIndicator, Alert, ScrollView, Modal, TouchableOpacity, FlatList, Image } from 'react-native'; // Agregado FlatList e Image
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useNavigation } from 'expo-router';
+import { useNavigation, useRouter } from 'expo-router';
 
 import { ThemedView } from '@/components/ThemedView';
 import { ThemedText } from '@/components/ThemedText';
@@ -21,6 +21,7 @@ export default function MatchesScreen() {
   const [matchesData, setMatchesData] = useState<MatchDetails[] | null>(null);
   const [organizedData, setOrganizedData] = useState<OrganizedMatchInfo[] | null>(null);
   const [postScudettoData, setPostScudettoData] = useState<PostScudettoMatchInfo[] | null | undefined>(undefined);
+  const router = useRouter();
   const navigation = useNavigation();
   const colorScheme = useColorScheme();
   const isFocused = useIsFocused();
@@ -268,6 +269,18 @@ export default function MatchesScreen() {
     });
   };
 
+  const handlePressMatchItem = (matchItem: PostScudettoMatchInfo) => {
+    if (matchItem.match && matchItem.match.trim() !== '') {
+      const matchIdentifier = `${matchItem.Team || 'Equipo'} vs ${matchItem.equipoContrario || 'Oponente'} (${matchItem.fecha})`;
+      router.push({
+        pathname: `/match-analysis`,
+        params: { matchUrl: encodeURIComponent(matchItem.match), matchIdentifier: encodeURIComponent(matchIdentifier) },
+      });
+    } else {
+      Alert.alert("Sin Enlace", "Este partido no tiene un enlace de detalles para analizar.");
+    }
+  };
+
   const renderDailyMatchItem = ({ item }: { item: PostScudettoMatchInfo }) => {
     const opponentTier = item.opponentTier;
     const shouldShowOpponentEmblemInDaily = (opponentTier === 'TierS' || opponentTier === 'TierSred') && item.opponentEmblemSrc;
@@ -306,49 +319,53 @@ export default function MatchesScreen() {
         }
       }
       return (
-        <View style={[styles.dailyMatchItemContainer, styles.statusHighlightItem, specialStyle]}>
-          <ThemedText style={styles.statusHighlightText}>{text}</ThemedText>
-        </View>
+        <TouchableOpacity onPress={() => handlePressMatchItem(item)} activeOpacity={item.match ? 0.7 : 1}>
+          <View style={[styles.dailyMatchItemContainer, styles.statusHighlightItem, specialStyle]}>
+            <ThemedText style={styles.statusHighlightText}>{text}</ThemedText>
+          </View>
+        </TouchableOpacity>
       );
     }
     // Si llegamos aquí, es un partido normal O un World/World en Competicion con Status="Negativo"
     // (que queremos renderizar normalmente, y la lógica de deduplicación ya manejó que solo aparezca una vez).
     return (
-      <ThemedView style={styles.dailyMatchItemContainer} lightColor="#f9f9f9" darkColor="#2C2C2E">
-        <View style={styles.matchHeaderRow}>
-            <View style={styles.matchHeaderTeamInfo}>
-              {shouldShowTeamEmblemInHeader && item.teamEmblemSrc && (
-                <Image source={{ uri: item.teamEmblemSrc }} style={styles.headerTeamEmblem} />
-              )}
-              <ThemedText style={styles.matchTeamNameHeaderText} numberOfLines={1} ellipsizeMode="tail">{item.Team || 'Equipo N/A'}</ThemedText>
-            </View>
-            {item.Ronda && <ThemedText style={styles.matchRondaText}>Jda: {item.Ronda}</ThemedText>}
-            {item.formato && <ThemedText style={styles.matchRondaText}>{item.formato.charAt(0).toUpperCase() + item.formato.slice(1)}</ThemedText>}
-        </View>
-
-        <View style={styles.matchDetailRow}>
-            {/* Similar to team-matches: Date/Time on left, then Opponent, then Location */}
-            <View style={styles.dailyMatchLeftAndMiddleContainer}>
-                <View style={styles.dailyMatchDateTimeContainer}>
-                    <ThemedText style={styles.dailyMatchDateSmall}>{item.fecha || 'Fecha N/A'}</ThemedText>
-                    {item.hora && <ThemedText style={styles.dailyMatchTimeSmall}>{item.hora}</ThemedText>}
-                </View>
-
-                <View style={[styles.dailyMatchVerticalSeparator, { backgroundColor: Colors[colorScheme ?? 'light'].icon }]} />
-
-                {shouldShowOpponentEmblemInDaily && item.opponentEmblemSrc && (
-                    <Image source={{ uri: item.opponentEmblemSrc }} style={styles.dailyMatchOpponentEmblem} />
+      <TouchableOpacity onPress={() => handlePressMatchItem(item)} activeOpacity={item.match ? 0.7 : 1}>
+        <ThemedView style={styles.dailyMatchItemContainer} lightColor="#f9f9f9" darkColor="#2C2C2E">
+          <View style={styles.matchHeaderRow}>
+              <View style={styles.matchHeaderTeamInfo}>
+                {shouldShowTeamEmblemInHeader && item.teamEmblemSrc && (
+                  <Image source={{ uri: item.teamEmblemSrc }} style={styles.headerTeamEmblem} />
                 )}
-                <ThemedText style={styles.dailyMatchOpponentName} numberOfLines={2} ellipsizeMode="tail">
-                    {opponentDisplayName}
-                </ThemedText>
-            </View>
+                <ThemedText style={styles.matchTeamNameHeaderText} numberOfLines={1} ellipsizeMode="tail">{item.Team || 'Equipo N/A'}</ThemedText>
+              </View>
+              {item.Ronda && <ThemedText style={styles.matchRondaText}>Jda: {item.Ronda}</ThemedText>}
+              {item.formato && <ThemedText style={styles.matchRondaText}>{item.formato.charAt(0).toUpperCase() + item.formato.slice(1)}</ThemedText>}
+          </View>
 
-            {item.lugar && ['H', 'A', 'N'].includes(item.lugar) && (
-                <ThemedText style={styles.locationTextDaily}>{item.lugar}</ThemedText>
-            )}
-        </View>
-      </ThemedView>
+          <View style={styles.matchDetailRow}>
+              {/* Similar to team-matches: Date/Time on left, then Opponent, then Location */}
+              <View style={styles.dailyMatchLeftAndMiddleContainer}>
+                  <View style={styles.dailyMatchDateTimeContainer}>
+                      <ThemedText style={styles.dailyMatchDateSmall}>{item.fecha || 'Fecha N/A'}</ThemedText>
+                      {item.hora && <ThemedText style={styles.dailyMatchTimeSmall}>{item.hora}</ThemedText>}
+                  </View>
+
+                  <View style={[styles.dailyMatchVerticalSeparator, { backgroundColor: Colors[colorScheme ?? 'light'].icon }]} />
+
+                  {shouldShowOpponentEmblemInDaily && item.opponentEmblemSrc && (
+                      <Image source={{ uri: item.opponentEmblemSrc }} style={styles.dailyMatchOpponentEmblem} />
+                  )}
+                  <ThemedText style={styles.dailyMatchOpponentName} numberOfLines={2} ellipsizeMode="tail">
+                      {opponentDisplayName}
+                  </ThemedText>
+              </View>
+
+              {item.lugar && ['H', 'A', 'N'].includes(item.lugar) && (
+                  <ThemedText style={styles.locationTextDaily}>{item.lugar}</ThemedText>
+              )}
+          </View>
+        </ThemedView>
+      </TouchableOpacity>
     );
   };
 
