@@ -6,6 +6,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { PostScudettoMatchInfo } from '@/api/postscudetto';
 import { ThemedView } from '@/components/ThemedView';
 import { ThemedText } from '@/components/ThemedText';
+// import { useColorScheme } from '@/hooks/useColorScheme'; // No se usa directamente aquí, pero podría ser útil para estilos
+// import { Colors } from '@/constants/Colors'; // No se usa directamente aquí
 
 const POST_SCUDETTO_DATA_KEY = 'postScudettoAllMatchData'; // Debe coincidir con la clave en matches.tsx
 
@@ -21,7 +23,7 @@ export default function TeamMatchesScreen() {
   const [teamMatches, setTeamMatches] = useState<PostScudettoMatchInfo[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  // const colorScheme = useColorScheme(); // No se usa directamente aquí, pero podría ser útil para estilos
+  // const colorScheme = useColorScheme(); // Descomentar si se usa para estilos
 
   useEffect(() => {
     const loadMatches = async () => {
@@ -54,7 +56,7 @@ export default function TeamMatchesScreen() {
     };
 
     loadMatches();
-  }, [teamId, teamNameForFilter]);
+  }, [teamId, teamNameForFilter, teamNameForDisplay]); // Añadido teamNameForDisplay a las dependencias por si cambia
 
   const handlePressMatchItem = (matchItem: PostScudettoMatchInfo) => {
     if (matchItem.match && matchItem.match.trim() !== '') {
@@ -76,11 +78,10 @@ export default function TeamMatchesScreen() {
       item.Competicion.trim() !== '' && 
       (index === 0 || item.Competicion !== prevItem?.Competicion);
 
-    const opponentTier = item.opponentTier; // Usar el tier del oponente
-    const shouldShowOpponentEmblem = (opponentTier === 'TierS' || opponentTier === 'TierSred') && item.opponentEmblemSrc; // Usar emblema y tier del oponente
+    const opponentTier = item.opponentTier; 
+    const shouldShowOpponentEmblem = (opponentTier === 'TierS' || opponentTier === 'TierSred') && item.opponentEmblemSrc; 
     
     let opponentDisplayName = item.equipoContrario || 'Oponente N/A';
-    // Modificación: Incluir item.Competicion === 'Competencia' en la condición
     if (
       (item.isMainLeagueCompetition || item.Competicion === 'Competencia' || item.Competicion === 'Competicion') && 
       !item.opponentTier) {
@@ -90,11 +91,9 @@ export default function TeamMatchesScreen() {
     const isWorldWorldCompeticionPairWithNegativeStatus =
       item.tier === "World" &&
       item.opponentTier === "World" &&
-      item.Competicion === "Competicion" && // Asumimos que correcciones.ts ya cambió null a "Competicion"
+      item.Competicion === "Competicion" && 
       item.Status === "Negativo";
 
-    // Casos especiales para "Champion", "Post scudetto" y "Negativo"
-    // y "Parón Internacional"
     if (
       item.Competicion === 'Parón Internacional' ||
       item.Status === 'Champion' ||
@@ -110,7 +109,7 @@ export default function TeamMatchesScreen() {
         specialStyle = styles.championItem; text = 'CAMPEÓN';
       } else if (item.Status === 'Post scudetto') {
         specialStyle = styles.postScudettoItem; text = 'POST SCUDETTO';
-      } else if (item.Status === 'Negativo') { // Solo se alcanza si !isWorldWorldCompeticionPairWithNegativeStatus
+      } else if (item.Status === 'Negativo') { 
         specialStyle = styles.negativoItem; text = 'NEGATIVO';
       }
       return (
@@ -122,13 +121,6 @@ export default function TeamMatchesScreen() {
       );
     }
 
-    // NUEVO: Manejar "Parón Internacional"
-    // Este chequeo debe ir ANTES del renderizado normal del partido.
-    if (item.Competicion === 'Parón Internacional') {
-      // Ya manejado arriba, este bloque no debería alcanzarse si la lógica es correcta.
-      // Se podría remover o dejar como un fallback si se prefiere.
-    }
-    // Renderizado normal del partido
     return (
       <TouchableOpacity onPress={() => handlePressMatchItem(item)} activeOpacity={item.match ? 0.7 : 1}>
         <>
@@ -139,7 +131,6 @@ export default function TeamMatchesScreen() {
               </ThemedText>
               {item.formato && item.formato.trim() !== '' && (
                 <ThemedText style={styles.competitionFormatText}>
-                  {/* Capitalizamos la primera letra del formato */}
                   {` (${item.formato.charAt(0).toUpperCase() + item.formato.slice(1)})`}
                 </ThemedText>
               )}
@@ -153,14 +144,14 @@ export default function TeamMatchesScreen() {
                   {item.hora && <ThemedText style={styles.matchTimeSmall}>{item.hora}</ThemedText>}
                 </View>
                 <View style={styles.verticalSeparator} />
-                {shouldShowOpponentEmblem && ( // Condición basada en el oponente
+                {shouldShowOpponentEmblem && ( 
                   <Image
-                    source={{ uri: item.opponentEmblemSrc! }} // Usar el emblema del oponente
-                    style={styles.teamEmblemStyle} // El estilo puede ser el mismo
+                    source={{ uri: item.opponentEmblemSrc! }} 
+                    style={styles.teamEmblemStyle} 
                   />
                 )}
                 <ThemedText 
-                  style={styles.matchOpponentSmall} // Se ajustará el estilo abajo
+                  style={styles.matchOpponentSmall} 
                   numberOfLines={2} ellipsizeMode="tail">
                   {opponentDisplayName}
                 </ThemedText>
@@ -212,6 +203,11 @@ export default function TeamMatchesScreen() {
           ListHeaderComponent={<ThemedText type="subtitle" style={styles.listHeader}>{teamNameForDisplay}</ThemedText>}
         />
       )}
+      {!isLoading && !error && teamMatches.length > 0 && (
+        <TouchableOpacity style={styles.squadButton} onPress={() => Alert.alert("Squad", "Botón Squad presionado")}>
+          <ThemedText style={styles.squadButtonText}>Squad</ThemedText>
+        </TouchableOpacity>
+      )}
     </ThemedView>
   );
 }
@@ -241,29 +237,29 @@ const styles = StyleSheet.create({
   },
   listContentContainer: {
     paddingHorizontal: 10,
-    paddingBottom: 20,
+    paddingBottom: 80, // Aumentado para dejar espacio al botón flotante
   },
   listHeader: { 
     textAlign: 'center',
     marginVertical: 15,
   },
-  competitionHeaderContainer: { // Nuevo estilo para el contenedor de la competición y el formato
+  competitionHeaderContainer: { 
     flexDirection: 'row',
-    alignItems: 'baseline', // Alinea bien textos de diferentes tamaños
+    alignItems: 'baseline', 
     marginTop: 15,
     marginBottom: 5,
     marginHorizontal: 5,
     paddingLeft: 10,
   },
-  competitionHeaderText: { // Estilo para el texto de la competición
+  competitionHeaderText: { 
     fontSize: 16,
     fontWeight: '600',
   },
-  competitionFormatText: { // Estilo para el texto del formato
+  competitionFormatText: { 
     fontSize: 13,
     fontWeight: '500',
     opacity: 0.8,
-    marginLeft: 6, // Espacio entre la competición y el formato
+    marginLeft: 6, 
   },
   matchItem: {
     paddingVertical: 10, 
@@ -291,20 +287,15 @@ const styles = StyleSheet.create({
   },
   dateTimeContainer: {
     flexDirection: 'column',
-    alignItems: 'center', // Cambiado a 'center' para centrar la hora debajo de la fecha
+    alignItems: 'center', 
     minWidth: 55, 
   },
-  verticalSeparator: { // El backgroundColor se aplicará dinámicamente
+  verticalSeparator: { 
     height: '60%',
     width: 1,
     marginHorizontal: 8,
-    opacity: 0.6, // Aumentada la opacidad para mayor visibilidad
-    // El color del separador se tomará del tema a través de un componente ThemedView o similar si es necesario,
-    // o se puede definir aquí si es estático o se pasa como prop.
-    // Por ahora, lo dejamos sin color explícito para que herede o se defina en un nivel superior si es necesario.
-    // Si se quiere un color específico, se puede añadir:
-    // backgroundColor: '#cccccc', // Ejemplo de color claro
-    // backgroundColor: '#555555', // Ejemplo de color oscuro
+    opacity: 0.6, 
+    backgroundColor: '#cccccc', // Color de ejemplo, ajustar según tema
   },
   matchDateSmall: { 
     fontSize: 11, 
@@ -318,7 +309,6 @@ const styles = StyleSheet.create({
     flex: 1, 
     fontSize: 13, 
     fontWeight: '600',
-    // marginLeft: 8, // Se elimina este margen, el emblema lo gestionará
   },
   locationContainer: { 
     minWidth: 15, 
@@ -328,36 +318,53 @@ const styles = StyleSheet.create({
     fontSize: 12, 
     fontWeight: 'bold',
   },
-  // Estilos para los items de estado especial
   statusHighlightItem: {
     justifyContent: 'center',
     alignItems: 'center',
-    height: 60, // Altura fija para estos items especiales, ajusta según necesidad
-    paddingVertical: 10, // Asegurar que el padding no interfiera con la altura
+    height: 60, 
+    paddingVertical: 10, 
   },
   championItem: {
-    backgroundColor: 'red', // Fondo rojo para campeón
+    backgroundColor: 'red', 
   },
   postScudettoItem: {
-    backgroundColor: 'darkred', // Un rojo más oscuro para post scudetto, o el mismo si prefieres
+    backgroundColor: 'darkred', 
   },
   negativoItem: {
-    backgroundColor: '#8B0000', // Maroon, un rojo oscuro diferente para Negativo
+    backgroundColor: '#8B0000', 
   },
-  internationalBreakItem: { // Nuevo estilo para el parón internacional
-    backgroundColor: '#4682B4', // SteelBlue, o el color que prefieras
+  internationalBreakItem: { 
+    backgroundColor: '#4682B4', 
   },
   statusHighlightText: {
-    color: 'white', // Texto blanco para contraste
+    color: 'white', 
     fontSize: 18,
     fontWeight: 'bold',
     textAlign: 'center',
   },
   teamEmblemStyle: {
-    width: 20, // Ajusta el tamaño según sea necesario
-    height: 20, // Ajusta el tamaño según sea necesario
+    width: 20, 
+    height: 20, 
     resizeMode: 'contain',
-    marginRight: 8, // Espacio entre el emblema y el nombre del oponente
-    // Alineación vertical ya manejada por alignItems: 'center' en leftAndMiddleContainer
+    marginRight: 8, 
+  },
+  squadButton: {
+    position: 'absolute',
+    bottom: 30,
+    right: 30,
+    backgroundColor: '#007AFF', // Un color de ejemplo, puedes ajustarlo
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 25, // Para hacerlo más redondeado
+    elevation: 5, // Sombra para Android
+    shadowColor: '#000', // Sombra para iOS
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+  },
+  squadButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });
