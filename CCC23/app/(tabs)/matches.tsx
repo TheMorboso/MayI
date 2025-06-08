@@ -83,7 +83,7 @@ export default function MatchesScreen() {
       }
     } else if (postScudettoData && postScudettoData.length > 0) {
       const formattedSelectedDate = dateToDDMMYYYY(selectedDate);
-      
+
       // Obtener todos los partidos para la fecha que no sean "Parón Internacional"
       const rawMatchesForDate = postScudettoData.filter(
         match => match.fecha === formattedSelectedDate && match.Competicion !== "Parón Internacional"
@@ -196,7 +196,7 @@ export default function MatchesScreen() {
       const savedSeason = await AsyncStorage.getItem(SEASON_STORAGE_KEY);
 
       for (const team of savedTeams) {
-        if (team.tier === 'TierA') continue;
+        if (team.tier === 'TierA' || team.tier === 'Red') continue; // Skip TierA and Red teams
         if (!team.originalUrl) {
           allScrapedMatches.push({ Team: team.teamName || 'unknown_team_name_in_loop', error: 'URL original no encontrada.' });
           continue;

@@ -8,7 +8,7 @@ import { useColorScheme } from '@/hooks/useColorScheme';
 import { Colors } from '@/constants/Colors';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useIsFocused } from '@react-navigation/native';
-import { scrapeWorldFootballTeamData, ScrapedTeamInfo } from '../../api/scraper';
+import { scrapeWorldFootballTeamData, ScrapedTeamInfo, TeamTierType } from '../../api/scraper';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 
 const TIER_OPTIONS = ["TierS", "TierSred", "TierA", "TierC", "Red", "World"] as const;
@@ -88,8 +88,8 @@ export default function TeamsScreen() {
           return;
         }
 
-        // Para TierA y World, no necesitamos la información de la primera pestaña de navegación (liga/temporada)
-        if (selectedTier === "World" || selectedTier === "TierA") {
+        // Para TierA, World y Red, no necesitamos la información de la primera pestaña de navegación (liga/temporada)
+        if (selectedTier === "World" || selectedTier === "TierA" || selectedTier === "Red") {
           scrapedData.firstNavLinkText = null;
           scrapedData.firstNavLinkHref = null;
         }
@@ -104,7 +104,7 @@ export default function TeamsScreen() {
         const existingIndex = teamsArray.findIndex(team => team.originalUrl === teamWithTier.originalUrl);
         if (existingIndex > -1) {
           console.log(`El team con URL ${teamWithTier.originalUrl} ya existe. Actualizando...`);
-          teamsArray[existingIndex] = teamWithTier; 
+          teamsArray[existingIndex] = teamWithTier;
         } else {
           teamsArray.push(teamWithTier);
         }
@@ -261,14 +261,14 @@ export default function TeamsScreen() {
                   setSelectedTier(null);
                   setModalVisible(false);
                 }}
-                color={Platform.OS === 'ios' 
+                color={Platform.OS === 'ios'
                         ? (colorScheme === 'dark' ? Colors.dark.tint : '#f44336')
                         : '#f44336'
                       }
               />
-              <Button 
-                title="Agregar" 
-                onPress={handleAddItem} 
+              <Button
+                title="Agregar"
+                onPress={handleAddItem}
                 color={Colors.light.tint}
                 disabled={!inputText.trim() || !selectedTier}
               />

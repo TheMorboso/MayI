@@ -11,6 +11,11 @@ export function processPositiveNegative(
   return matches.map((currentMatch, index, allMatchesArray) => {
     const updatedMatch = { ...currentMatch }; // Clonar el partido actual
 
+    // REGLA GENERAL PARA TIER "RED": Siempre "Negativo" si el equipo o el oponente es "Red"
+    if (updatedMatch.tier === "Red" || updatedMatch.opponentTier === "Red") {
+      updatedMatch.Status = "Negativo";
+    }
+
     // NUEVA REGLA: TierSred vs TierSred siempre es "Negativo"
     if (updatedMatch.tier === "TierSred" && updatedMatch.opponentTier === "TierSred") {
       updatedMatch.Status = "Negativo";

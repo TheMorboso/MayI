@@ -17,8 +17,11 @@ export interface MatchAnalysisDetails {
   awayTeamName?: string | null;
   homePlayers?: PlayerInfo[];
   awayPlayers?: PlayerInfo[];
-  homeSubstitutes?: PlayerInfo[];
-  awaySubstitutes?: PlayerInfo[];
+  homeSubstitutes?: PlayerInfo[]; // Se mantiene la propiedad, pero siempre estará vacía
+  awaySubstitutes?: PlayerInfo[]; // Se mantiene la propiedad, pero siempre estará vacía
+  homeManager?: string | null;
+  awayManager?: string | null;
+  stadiumName?: string | null;
   error?: string | null;
   sourceUrl?: string | null;
 }
@@ -100,7 +103,6 @@ export async function scrapeMatchAnalysis(url: string): Promise<MatchAnalysisDet
     const $ = cheerio.load(htmlText);
 
     // --- Debugging: Guardar el HTML completo (opcional, puede ser muy grande) ---
-    // Descomenta las siguientes líneas si necesitas inspeccionar el HTML completo y tienes 'fs'
     // try {
     //   fs.writeFileSync('debug_page.html', htmlText);
     //   console.log('HTML completo guardado en debug_page.html');
@@ -236,9 +238,7 @@ export async function scrapeMatchAnalysis(url: string): Promise<MatchAnalysisDet
     console.log('Tabla de Jugadores Visitante (awayPlayerTable) encontrada:', awayPlayerTable.length > 0);
 
     let homePlayersList: PlayerInfo[] = [];
-    let homeSubstitutesList: PlayerInfo[] = [];
     let awayPlayersList: PlayerInfo[] = [];
-    let awaySubstitutesList: PlayerInfo[] = [];
 
     // Función helper para procesar una tabla de jugadores (home o away)
     const processPlayerTable = (playerTable: cheerio.Cheerio<cheerio.Element>, isHomeTeam: boolean) => {
@@ -249,56 +249,44 @@ export async function scrapeMatchAnalysis(url: string): Promise<MatchAnalysisDet
 
         const allRowsInTable = playerTable.find('tr');
         let isParsingSubstitutes = false;
-        const starterRows: cheerio.Element[] = [];
-        const substituteRows: cheerio.Element[] = [];
-
+        const starterRows: cheerio.Element[] = [];    
+    
         allRowsInTable.each((_, rowEl) => {
             const $row = $(rowEl);
             // Identificar la fila de encabezado "Substitutes"
             const ueberschriftCell = $row.find('td.ueberschrift[colspan="3"]');
             if (ueberschriftCell.length > 0 && ueberschriftCell.find('b').text().trim().toLowerCase() === 'substitutes') {
                 isParsingSubstitutes = true;
-                return; // Saltar esta fila de encabezado
+                return; // Saltar esta fila de encabezado y las siguientes (para no procesar suplentes)
+            }
+
+            // Si ya estamos en la sección de suplentes (después del encabezado "Substitutes"), no procesar más filas.
+            if (isParsingSubstitutes) {
+                return;
             }
 
             // Saltar otras filas que no sean de jugadores (ej. cabeceras TH o filas con menos de 2 celdas TD)
-            // Esto es similar al filtro en scrapePlayersFromTable
             if ($row.find('th').length > 0 || $row.find('td').length < 2) {
-                // Asegurarse de no saltar la fila "Substitutes" si por alguna razón no se capturó arriba
-                if (ueberschriftCell.length === 0) {
-                    return;
-                }
+                return;
             }
-
-            if (isParsingSubstitutes) {
-                substituteRows.push(rowEl);
-            } else {
-                starterRows.push(rowEl);
-            }
+            // Solo se añaden a starterRows si no estamos en la sección de suplentes
+            starterRows.push(rowEl);
         });
 
         // Helper para llamar a scrapePlayersFromTable con un conjunto de filas
         const getPlayersFromRows = (rows: cheerio.Element[]): PlayerInfo[] => {
             if (rows.length === 0) return [];
-            // Crear un nuevo Cheerio instance con solo estas filas envueltas en una tabla
-            // Es importante usar $(rowEl).prop('outerHTML') para obtener el HTML completo de la fila
             const tableHtml = '<table><tbody>' + rows.map(r => $(r).prop('outerHTML')).join('') + '</tbody></table>';
-            const $tempCheerio = cheerio.load(tableHtml); // Cargar solo el fragmento
-            // Llamar a scrapePlayersFromTable con el $ original para el contexto de Cheerio,
-            // pero pasar el elemento de tabla del $tempCheerio.
+            const $tempCheerio = cheerio.load(tableHtml);
             return scrapePlayersFromTable($, $tempCheerio('table').first());
         };
 
         if (isHomeTeam) {
             homePlayersList = getPlayersFromRows(starterRows);
-            homeSubstitutesList = getPlayersFromRows(substituteRows);
             console.log('Jugadores Titulares Locales extraídos:', homePlayersList.length);
-            console.log('Jugadores Suplentes Locales extraídos:', homeSubstitutesList.length);
         } else {
             awayPlayersList = getPlayersFromRows(starterRows);
-            awaySubstitutesList = getPlayersFromRows(substituteRows);
             console.log('Jugadores Titulares Visitantes extraídos:', awayPlayersList.length);
-            console.log('Jugadores Suplentes Visitantes extraídos:', awaySubstitutesList.length);
         }
     };
 
@@ -310,11 +298,77 @@ export async function scrapeMatchAnalysis(url: string): Promise<MatchAnalysisDet
     console.log('\n--- Procesando Bloque Derecho (Away) ---');
     processPlayerTable(awayPlayerTable, false);
 
+    // Extracción de Entrenadores
+    let homeManagerName: string | null = null;
+    let awayManagerName: string | null = null;
+
+    // Buscar la tabla de entrenadores. Esta tabla es la que sigue a la mainLayoutTable (que contiene las alineaciones)
+    // y tiene una estructura específica.
+    // El HTML proporcionado para los entrenadores es:
+    // <table class="standard_tabelle" cellpadding="3" cellspacing="1">
+    //   <tr>
+    //     <td width="50%" valign="top"> <p> <b>Manager: <a ...>Nombre</a></b> </p> ... </td>
+    //     <td width="50%" valign="top"> <p> <b>Manager: <a ...>Nombre</a></b> </p> ... </td>
+    //   </tr>
+    // </table>
+    // Esta tabla suele estar después de un <br /> que sigue a la tabla de alineaciones.
+    
+    let coachTable: cheerio.Cheerio<cheerio.Element> | undefined;
+
+    // Intento 1: Buscar la tabla de entrenadores como la siguiente `table.standard_tabelle`
+    // después de `mainLayoutTable` (que es la tabla que contiene las dos `td` con las alineaciones).
+    // Esta búsqueda es más robusta si la tabla de entrenadores está directamente después de un <br/>
+    // que a su vez está después de la tabla de alineaciones.
+    if (mainLayoutTable.length > 0) {
+        // Buscamos un <br> que sea hermano de mainLayoutTable y luego la tabla siguiente a ese <br>
+        const brAfterMainLayout = mainLayoutTable.next('br');
+        if (brAfterMainLayout.length > 0) {
+            coachTable = brAfterMainLayout.next('table.standard_tabelle:has(td p b:contains("Manager:"))');
+        }
+        // Fallback si no hay <br> o la estructura es diferente: buscar cualquier tabla siguiente con "Manager:"
+        if (!coachTable || coachTable.length === 0) {
+            coachTable = mainLayoutTable.nextAll('table.standard_tabelle:has(td p b:contains("Manager:"))').first();
+        }
+    }
+
+    // Intento 2: Si mainLayoutTable no se encontró o el Intento 1 falló,
+    // buscar globalmente una `table.standard_tabelle` que contenga "Manager:".
+    // Esto es menos preciso.
+    if (!coachTable || coachTable.length === 0) {
+        console.log("Tabla de entrenadores no encontrada con el método primario, intentando búsqueda global.");
+        coachTable = $('table.standard_tabelle:has(td p b:contains("Manager:"))').first();
+    }
+    
+    console.log("Tabla de Entrenadores encontrada:", coachTable.length > 0);
+    if (coachTable && coachTable.length > 0) {
+        const coachCells = coachTable.find('tr').first().children('td');
+        if (coachCells.length >= 1) {
+            // El selector busca el texto "Manager:" dentro de un <b>, que está dentro de un <p>, y luego toma el texto del <a>
+            homeManagerName = coachCells.eq(0).find('p > b:contains("Manager:")').parent().find('a').first().text().trim() || null;
+        }
+        if (coachCells.length >= 2) {
+            awayManagerName = coachCells.eq(1).find('p > b:contains("Manager:")').parent().find('a').first().text().trim() || null;
+        }
+    }
+    console.log('Entrenador Local:', homeManagerName || 'No encontrado');
+    console.log('Entrenador Visitante:', awayManagerName || 'No encontrado');
+
+    // Extracción del Nombre del Estadio
+    let stadiumName: string | null = null;
+    // Buscamos una tabla que contenga una imagen con title="stadium"
+    // y luego tomamos el texto del enlace en la tercera celda de la primera fila.
+    const stadiumTable = $('table.standard_tabelle:has(img[title="stadium"])').first();
+    if (stadiumTable.length > 0) {
+        stadiumName = stadiumTable.find('tr').first().find('td').eq(2).find('a').first().text().trim() || null;
+    }
+    console.log('Nombre del Estadio:', stadiumName || 'No encontrado');
+
+
     console.log('\n--- RESUMEN DE EXTRACCIÓN ---');
     console.log('Titulares Locales:', homePlayersList.length);
-    console.log('Suplentes Locales:', homeSubstitutesList.length);
     console.log('Titulares Visitantes:', awayPlayersList.length);
-    console.log('Suplentes Visitantes:', awaySubstitutesList.length);
+    console.log('Entrenadores:', homeManagerName || 'N/A', '-', awayManagerName || 'N/A');
+    console.log('Estadio:', stadiumName || 'N/A');
     console.log('--- FIN DEBUG scrapeMatchAnalysis ---\n');
 
     return {
@@ -323,8 +377,11 @@ export async function scrapeMatchAnalysis(url: string): Promise<MatchAnalysisDet
       awayTeamName,
       homePlayers: homePlayersList,
       awayPlayers: awayPlayersList,
-      homeSubstitutes: homeSubstitutesList,
-      awaySubstitutes: awaySubstitutesList,
+      homeSubstitutes: [], 
+      awaySubstitutes: [], 
+      homeManager: homeManagerName,
+      awayManager: awayManagerName,
+      stadiumName: stadiumName,
       sourceUrl: url,
     };
   } catch (error: any) {
