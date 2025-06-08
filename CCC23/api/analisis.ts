@@ -1,4 +1,5 @@
 import * as cheerio from 'cheerio/slim';
+// import fs from 'fs'; // Descomenta si quieres guardar el HTML y tienes 'fs' disponible en tu entorno de ejecución
 
 export interface PlayerInfo {
   number?: string | null;
@@ -31,43 +32,44 @@ export async function scrapeMatchAnalysis(url: string): Promise<MatchAnalysisDet
   function scrapePlayersFromTable($: cheerio.CheerioAPI, tableElement: cheerio.Cheerio<cheerio.Element>): PlayerInfo[] {
     const players: PlayerInfo[] = [];
     if (!tableElement || tableElement.length === 0) {
+      console.log('[scrapePlayersFromTable] La tabla de jugadores está vacía o no se proporcionó.');
       return players;
     }
-    // console.log('Table element HTML (fragmento):', tableElement.html()?.substring(0, 300));
+    // console.log('[scrapePlayersFromTable] HTML de la tabla (primeros 300):', tableElement.html()?.substring(0, 300));
 
-    tableElement.find('tr').each((_, rowElement) => {
+    tableElement.find('tr').each((idx, rowElement) => {
       const row = $(rowElement);
       const cells = row.find('td');
 
-      // Omitir filas de cabecera (th) o filas que no parecen ser de jugador (ej. sin suficientes celdas)
-      // console.log(`Row HTML: ${row.html()?.substring(0,100)} | TH count: ${row.find('th').length} | TD count: ${cells.length}`);
+      // console.log(`[scrapePlayersFromTable] Fila ${idx}: TH count: ${row.find('th').length}, TD count: ${cells.length}`);
       if (row.find('th').length > 0 || cells.length < 2) {
-        return; 
+        // console.log(`[scrapePlayersFromTable] Fila ${idx} omitida (cabecera o celdas insuficientes).`);
+        return;
       }
 
       const playerNumber = $(cells[0]).text().trim() || null;
       const nameCell = $(cells[1]);
       let playerName = '';
 
-      // Intentar obtener el nombre del jugador desde la etiqueta <a>
       const nameLink = nameCell.find('a').first();
       if (nameLink.length > 0) {
         playerName = nameLink.text().trim();
       }
 
-      // Si playerName sigue vacío (porque no había <a> o el <a> estaba vacío),
-      // intentar obtener el texto de la celda completa, limpiando elementos comunes.
       if (!playerName) {
-        const tempNameCell = nameCell.clone(); // Clonar para no afectar otros procesamientos
-        tempNameCell.find('span, img, i, script, style, a').remove(); // Eliminar elementos no deseados, incluyendo <a> si falló antes
+        const tempNameCell = nameCell.clone();
+        tempNameCell.find('span, img, i, script, style, a').remove();
         playerName = tempNameCell.text().trim();
       }
-
-      // console.log(`Row: Number='${playerNumber}', Name='${playerName}', NameCellHTML='${nameCell.html()?.substring(0,100)}'`);
-      if (playerNumber && playerName) { // Solo añadir si tenemos número y nombre
+      
+      // console.log(`[scrapePlayersFromTable] Fila ${idx} procesada: Número='${playerNumber}', Nombre='${playerName}'`);
+      if (playerNumber && playerName) {
         players.push({ number: playerNumber, name: playerName });
+      } else {
+        // console.log(`[scrapePlayersFromTable] Fila ${idx} omitida (sin número o nombre): Número='${playerNumber}', Nombre='${playerName}'`);
       }
     });
+    console.log(`[scrapePlayersFromTable] Total de jugadores extraídos de esta tabla: ${players.length}`);
     return players;
   }
 
@@ -77,6 +79,9 @@ export async function scrapeMatchAnalysis(url: string): Promise<MatchAnalysisDet
       fullUrl = `https://${url}`;
     }
 
+    console.log('\n--- INICIO DEBUG scrapeMatchAnalysis ---');
+    console.log('URL Analizada:', fullUrl);
+
     const response = await fetch(fullUrl, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
@@ -84,6 +89,7 @@ export async function scrapeMatchAnalysis(url: string): Promise<MatchAnalysisDet
     });
 
     if (!response.ok) {
+      console.error(`Error al acceder a la URL: ${response.status}`);
       return {
         error: `Error al acceder a la URL del análisis del partido (${response.status}) para ${url}`,
         sourceUrl: url,
@@ -93,74 +99,223 @@ export async function scrapeMatchAnalysis(url: string): Promise<MatchAnalysisDet
     const htmlText = await response.text();
     const $ = cheerio.load(htmlText);
 
+    // --- Debugging: Guardar el HTML completo (opcional, puede ser muy grande) ---
+    // Descomenta las siguientes líneas si necesitas inspeccionar el HTML completo y tienes 'fs'
+    // try {
+    //   fs.writeFileSync('debug_page.html', htmlText);
+    //   console.log('HTML completo guardado en debug_page.html');
+    // } catch (writeErr) {
+    //   console.error('Error al guardar debug_page.html:', writeErr);
+    // }
+    // --------------------------------------------------------------------------
+
     const pageTitle = $('title').text().trim() || null;
+    console.log('Título de la Página (desde <title>):', pageTitle);
+    
     let homeTeamName: string | null = null;
     let awayTeamName: string | null = null;
 
-    // Intentar extraer nombres de equipos del título de la página
-    if (pageTitle) {
-        const reportIndex = pageTitle.indexOf(" Report - ");
-        if (reportIndex !== -1) {
-            const teamsPart = pageTitle.substring(0, reportIndex);
-            const teams = teamsPart.split(' - ');
-            if (teams.length >= 2) { // Puede haber más de un '-' en un nombre de equipo
-                homeTeamName = teams[0].trim();
-                awayTeamName = teams.slice(1).join(' - ').trim(); // Unir el resto por si el nombre del visitante tiene '-'
+    // Intentar extraer nombres de equipos del H1
+    const h1Element = $('div.breadcrumb > h1').first(); // Selector ajustado al HTML proporcionado
+    let h1Text = h1Element.text().trim();
+    console.log('Texto H1 (selector: "div.breadcrumb > h1"):', h1Text || 'No encontrado');
+
+    if (h1Text) {
+        // Ejemplo H1: "Germany » Bundesliga 2024/2025 » 34. Round » SC Freiburg - Eintracht Frankfurt 1:3"
+        // Extraer la última parte después de ' » ' que contiene los equipos y el resultado
+        const h1Parts = h1Text.split(' » ');
+        const matchTitlePartFromH1 = h1Parts.pop() || ""; // "SC Freiburg - Eintracht Frankfurt 1:3"
+        
+        // Quitar el marcador del final
+        const teamsOnlyTextFromH1 = matchTitlePartFromH1.replace(/\s+\d+:\d+(\s*\(.+?\))?$/, '').trim(); // "SC Freiburg - Eintracht Frankfurt"
+        console.log('Parte de equipos del H1 procesada:', teamsOnlyTextFromH1);
+
+        if (teamsOnlyTextFromH1.includes(' - ')) {
+            const parts = teamsOnlyTextFromH1.split(' - ');
+            if (parts.length >= 2) {
+                homeTeamName = parts[0].trim();
+                awayTeamName = parts.slice(1).join(' - ').trim(); // Para nombres de equipo con '-'
             }
         }
     }
 
-    // Selectores para los bloques de datos de cada equipo
-    // Intentamos encontrar el div.row que específicamente contiene los bloques de datos de alineación.
-    const lineupRow = $('div.content > div.row:has(> div.data[align="left"]):has(> div.data[align="right"])').first();
-
-    let leftDataBlock: cheerio.Cheerio<cheerio.Element>;
-    let rightDataBlock: cheerio.Cheerio<cheerio.Element>;
-
-    if (lineupRow.length) {
-      leftDataBlock = lineupRow.children('div.data[align="left"]').first();
-      rightDataBlock = lineupRow.children('div.data[align="right"]').first();
-    } else {
-      // Si no se encuentra la fila específica, inicializar como selectores vacíos para que .length sea 0
-      leftDataBlock = $(); 
-      rightDataBlock = $();
+    // Fallback al título de la página si la extracción del H1 falla o no da ambos nombres
+    if ((!homeTeamName || !awayTeamName) && pageTitle) {
+        console.log('Fallback: Extrayendo nombres de equipos desde el <title>');
+        // Ejemplo: "Germany - France 0:2 (Nations League A 2024/2025, Third place)"
+        // Regex para capturar "TeamA - TeamB" antes de un posible marcador
+        const teamNameMatch = pageTitle.match(/^(.*?) - (.*?)(?:\s+\d+:\d+|$|\s*\()/);
+        if (teamNameMatch && teamNameMatch.length >= 3 && teamNameMatch[1] && teamNameMatch[2]) {
+            homeTeamName = teamNameMatch[1].trim();
+            awayTeamName = teamNameMatch[2].trim();
+        } else {
+            // Si la regex falla, un intento más simple si el título no tiene marcador pero sí " - "
+            const parts = pageTitle.split(' - ');
+            if (parts.length >= 2) {
+                homeTeamName = parts[0].trim();
+                // Para el equipo visitante, tomar la segunda parte pero quitar detalles de competición si están entre paréntesis
+                awayTeamName = parts[1].split('(')[0].trim();
+            } else {
+                console.log('No se pudo deducir los nombres de los equipos del título con el formato esperado:', pageTitle);
+            }
+        }
     }
+    console.log('Equipo Local (deducido):', homeTeamName || 'No deducido');
+    console.log('Equipo Visitante (deducido):', awayTeamName || 'No deducido');
+
+    let homePlayerTable: cheerio.Cheerio<cheerio.Element> = $();
+    let awayPlayerTable: cheerio.Cheerio<cheerio.Element> = $();
+
+    // Intento 1: Buscar la tabla principal que sigue al div del anuncio
+    // Ser más específico: buscar la primera tabla SIGUIENTE a #wac_660x40_2
+    // que contenga al menos una celda (td) que a su vez contenga una table.standard_tabelle.
+    let mainLayoutTable = $('#wac_660x40_2').nextAll('table:has(td table.standard_tabelle)').first();
+    console.log("Intento 1: Tabla después de '#wac_660x40_2' encontrada:", mainLayoutTable.length > 0);
+
+    // Intento 2: Búsqueda general de la tabla de diseño si el Intento 1 falla
+    if (!mainLayoutTable.length) {
+        console.log("Intento 1 fallido. Intento 2: Búsqueda general de tabla de diseño.");
+        // Busca una tabla dentro de div.content que tenga dos celdas <td> en su primera fila,
+        // y cada celda contenga una table.standard_tabelle
+        $('div.content table').each((_, tableEl) => {
+            const $table = $(tableEl);
+            // Asegurarse de que estamos buscando en el tbody implícito o explícito
+            const firstRowCells = $table.children('tbody').children('tr').first().children('td');
+            if (firstRowCells.length === 2 &&
+                firstRowCells.eq(0).find('> table.standard_tabelle').length === 1 &&
+                firstRowCells.eq(1).find('> table.standard_tabelle').length === 1) {
+                mainLayoutTable = $table;
+                console.log("Intento 2: Tabla de diseño general encontrada.");
+                return false; // Romper el .each
+            }
+        });
+    }
+
+    if (mainLayoutTable.length) {
+        // Descomenta la siguiente línea para ver el HTML de la tabla principal si es necesario
+        // console.log("HTML de mainLayoutTable (primeros 500 chars):", mainLayoutTable.html()?.substring(0,500));
+
+        // Intentar sin asumir tbody explícito primero
+        const firstTr = mainLayoutTable.children('tr').first();
+        console.log(`Intento 1: Primera <tr> directa en mainLayoutTable encontrada: ${firstTr.length > 0}`);
+        let cells = firstTr.children('td');
+        console.log(`Intento 1: Celdas (td) en primera <tr> directa: ${cells.length}`);
+
+        if (cells.length === 0 && mainLayoutTable.children('tbody').length > 0) { // Si no se encuentran celdas y hay tbody, intentar con tbody
+            console.log("Intento 1: No se encontraron celdas en <tr> directa, buscando en <tbody> > <tr>.");
+            const firstTbody = mainLayoutTable.children('tbody').first();
+            const firstTrInTbody = firstTbody.children('tr').first();
+            console.log(`Intento 1: Primera <tr> en <tbody> encontrada: ${firstTrInTbody.length > 0}`);
+            cells = firstTrInTbody.children('td');
+            console.log(`Intento 1: Celdas (td) en primera <tr> de <tbody>: ${cells.length}`);
+        }
+        console.log(`FINAL: Celdas (td) encontradas para procesar: ${cells.length}`);
+
+        if (cells.length >= 1) {
+            // console.log("HTML de cells.eq(0) (primeros 300 chars):", cells.eq(0).html()?.substring(0,300)); // DEBUG
+            homePlayerTable = cells.eq(0).find('table.standard_tabelle').first();
+        }
+        if (cells.length >= 2) {
+            // console.log("HTML de cells.eq(1) (primeros 300 chars):", cells.eq(1).html()?.substring(0,300)); // DEBUG
+            awayPlayerTable = cells.eq(1).find('table.standard_tabelle').first();
+        }
+    } else {
+        // Intento 3: Como último recurso, buscar las dos primeras table.standard_tabelle
+        // Esto es menos preciso y asume que son las tablas de jugadores.
+        console.log("Intento 2 fallido. Intento 3: Buscar 'table.standard_tabelle' directamente.");
+        const allStandardTables = $('table.standard_tabelle');
+        if (allStandardTables.length >= 1) {
+            homePlayerTable = allStandardTables.eq(0);
+        }
+        if (allStandardTables.length >= 2) {
+            awayPlayerTable = allStandardTables.eq(1);
+        }
+    }
+
+    console.log('Tabla de Jugadores Local (homePlayerTable) encontrada:', homePlayerTable.length > 0);
+    console.log('Tabla de Jugadores Visitante (awayPlayerTable) encontrada:', awayPlayerTable.length > 0);
 
     let homePlayersList: PlayerInfo[] = [];
     let homeSubstitutesList: PlayerInfo[] = [];
     let awayPlayersList: PlayerInfo[] = [];
     let awaySubstitutesList: PlayerInfo[] = [];
 
-    console.log('Left data block length:', leftDataBlock.length);
-    // console.log('Left data block HTML (fragmento):', leftDataBlock.html()?.substring(0, 300));
-    if (leftDataBlock.length) {
-      const lineupTable = leftDataBlock.find('table.standard_tabelle').first();
-      console.log('Home lineup table length:', lineupTable.length);
-      // console.log('Home lineup table HTML:', lineupTable.html()?.substring(0, 300));
-      homePlayersList = scrapePlayersFromTable($, lineupTable);
-      leftDataBlock.find('h2').each((_, h2Elem) => {
-        if ($(h2Elem).text().trim().toLowerCase() === 'substitutes') {
-          const subsTable = $(h2Elem).next('table.standard_tabelle');
-          console.log('Home substitutes table length:', subsTable.length);
-          // console.log('Home substitutes table HTML:', subsTable.html()?.substring(0, 300));
-          homeSubstitutesList = scrapePlayersFromTable($, subsTable);
+    // Función helper para procesar una tabla de jugadores (home o away)
+    const processPlayerTable = (playerTable: cheerio.Cheerio<cheerio.Element>, isHomeTeam: boolean) => {
+        if (!playerTable.length) {
+            console.log(`Tabla de jugadores para ${isHomeTeam ? 'local' : 'visitante'} no encontrada.`);
+            return;
         }
-      });
-    }
 
-    console.log('Right data block length:', rightDataBlock.length);
-    // console.log('Right data block HTML (fragmento):', rightDataBlock.html()?.substring(0, 300));
-    if (rightDataBlock.length) {
-      awayPlayersList = scrapePlayersFromTable($, rightDataBlock.find('table.standard_tabelle').first());
-      rightDataBlock.find('h2').each((_, h2Elem) => {
-        if ($(h2Elem).text().trim().toLowerCase() === 'substitutes') {
-          const subsTable = $(h2Elem).next('table.standard_tabelle');
-          console.log('Away substitutes table length:', subsTable.length);
-          // console.log('Away substitutes table HTML:', subsTable.html()?.substring(0, 300));
-          awaySubstitutesList = scrapePlayersFromTable($, subsTable);
+        const allRowsInTable = playerTable.find('tr');
+        let isParsingSubstitutes = false;
+        const starterRows: cheerio.Element[] = [];
+        const substituteRows: cheerio.Element[] = [];
+
+        allRowsInTable.each((_, rowEl) => {
+            const $row = $(rowEl);
+            // Identificar la fila de encabezado "Substitutes"
+            const ueberschriftCell = $row.find('td.ueberschrift[colspan="3"]');
+            if (ueberschriftCell.length > 0 && ueberschriftCell.find('b').text().trim().toLowerCase() === 'substitutes') {
+                isParsingSubstitutes = true;
+                return; // Saltar esta fila de encabezado
+            }
+
+            // Saltar otras filas que no sean de jugadores (ej. cabeceras TH o filas con menos de 2 celdas TD)
+            // Esto es similar al filtro en scrapePlayersFromTable
+            if ($row.find('th').length > 0 || $row.find('td').length < 2) {
+                // Asegurarse de no saltar la fila "Substitutes" si por alguna razón no se capturó arriba
+                if (ueberschriftCell.length === 0) {
+                    return;
+                }
+            }
+
+            if (isParsingSubstitutes) {
+                substituteRows.push(rowEl);
+            } else {
+                starterRows.push(rowEl);
+            }
+        });
+
+        // Helper para llamar a scrapePlayersFromTable con un conjunto de filas
+        const getPlayersFromRows = (rows: cheerio.Element[]): PlayerInfo[] => {
+            if (rows.length === 0) return [];
+            // Crear un nuevo Cheerio instance con solo estas filas envueltas en una tabla
+            // Es importante usar $(rowEl).prop('outerHTML') para obtener el HTML completo de la fila
+            const tableHtml = '<table><tbody>' + rows.map(r => $(r).prop('outerHTML')).join('') + '</tbody></table>';
+            const $tempCheerio = cheerio.load(tableHtml); // Cargar solo el fragmento
+            // Llamar a scrapePlayersFromTable con el $ original para el contexto de Cheerio,
+            // pero pasar el elemento de tabla del $tempCheerio.
+            return scrapePlayersFromTable($, $tempCheerio('table').first());
+        };
+
+        if (isHomeTeam) {
+            homePlayersList = getPlayersFromRows(starterRows);
+            homeSubstitutesList = getPlayersFromRows(substituteRows);
+            console.log('Jugadores Titulares Locales extraídos:', homePlayersList.length);
+            console.log('Jugadores Suplentes Locales extraídos:', homeSubstitutesList.length);
+        } else {
+            awayPlayersList = getPlayersFromRows(starterRows);
+            awaySubstitutesList = getPlayersFromRows(substituteRows);
+            console.log('Jugadores Titulares Visitantes extraídos:', awayPlayersList.length);
+            console.log('Jugadores Suplentes Visitantes extraídos:', awaySubstitutesList.length);
         }
-      });
-    }
+    };
+
+    // Procesar tabla del equipo local
+    console.log('\n--- Procesando Bloque Izquierdo (Home) ---');
+    processPlayerTable(homePlayerTable, true);
+
+    // Procesar tabla del equipo visitante
+    console.log('\n--- Procesando Bloque Derecho (Away) ---');
+    processPlayerTable(awayPlayerTable, false);
+
+    console.log('\n--- RESUMEN DE EXTRACCIÓN ---');
+    console.log('Titulares Locales:', homePlayersList.length);
+    console.log('Suplentes Locales:', homeSubstitutesList.length);
+    console.log('Titulares Visitantes:', awayPlayersList.length);
+    console.log('Suplentes Visitantes:', awaySubstitutesList.length);
+    console.log('--- FIN DEBUG scrapeMatchAnalysis ---\n');
 
     return {
       title: pageTitle,
@@ -173,6 +328,9 @@ export async function scrapeMatchAnalysis(url: string): Promise<MatchAnalysisDet
       sourceUrl: url,
     };
   } catch (error: any) {
+    console.error('\n--- ERROR CRÍTICO EN scrapeMatchAnalysis ---');
+    console.error(error);
+    console.error('--- FIN ERROR CRÍTICO ---\n');
     return {
       error: `Error en el scraping del análisis del partido para ${url}: ${error.message || 'Error desconocido'}`,
       sourceUrl: url,
