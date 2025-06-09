@@ -1,10 +1,13 @@
+// match-analysis.tsx
 import React, { useEffect, useState, useCallback } from 'react';
 import { ActivityIndicator, StyleSheet, ScrollView, Alert, View, TouchableOpacity, Dimensions } from 'react-native';
 import { useLocalSearchParams, Stack, useRouter } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { ThemedView } from '@/components/ThemedView';
 import { ThemedText } from '@/components/ThemedText';
 import { scrapeMatchAnalysis, MatchAnalysisDetails, PlayerInfo } from '@/api/analisis';
+import { TeamTierType } from '@/api/scraper'; // Importar TeamTierType
 
 // --- DEFINICIONES Y CONSTANTES ---
 interface FormationSlot {
@@ -22,16 +25,16 @@ type FormationType = typeof FORMATIONS_ARRAY[number];
 
 const FORMATION_DEFINITIONS: Record<FormationType, FormationLayout> = {
   "4-4-2": [
-    { id: 'gk', label: 'POR', line: 'GK', topRatio: 0.92, leftRatio: 0.5 }, // GK más abajo para dar espacio
-    { id: 'rb', label: 'LD', line: 'DEF', topRatio: 0.75, leftRatio: 0.88 }, // Laterales más abiertos
+    { id: 'gk', label: 'POR', line: 'GK', topRatio: 0.92, leftRatio: 0.5 },
+    { id: 'rb', label: 'LD', line: 'DEF', topRatio: 0.75, leftRatio: 0.88 },
     { id: 'rcb', label: 'DFC', line: 'DEF', topRatio: 0.75, leftRatio: 0.63 },
     { id: 'lcb', label: 'DFC', line: 'DEF', topRatio: 0.75, leftRatio: 0.37 },
-    { id: 'lb', label: 'LI', line: 'DEF', topRatio: 0.75, leftRatio: 0.12 }, // Laterales más abiertos
+    { id: 'lb', label: 'LI', line: 'DEF', topRatio: 0.75, leftRatio: 0.12 },
     { id: 'rm', label: 'MD', line: 'MID', topRatio: 0.5, leftRatio: 0.88 },
     { id: 'rcm', label: 'MC', line: 'MID', topRatio: 0.5, leftRatio: 0.63 },
     { id: 'lcm', label: 'MC', line: 'MID', topRatio: 0.5, leftRatio: 0.37 },
     { id: 'lm', label: 'MI', line: 'MID', topRatio: 0.5, leftRatio: 0.12 },
-    { id: 'rs', label: 'DC', line: 'FWD', topRatio: 0.22, leftRatio: 0.6 }, // Delanteros un poco más abajo
+    { id: 'rs', label: 'DC', line: 'FWD', topRatio: 0.22, leftRatio: 0.6 },
     { id: 'ls', label: 'DC', line: 'FWD', topRatio: 0.22, leftRatio: 0.4 },
   ],
   "4-2-3-1": [
@@ -40,12 +43,12 @@ const FORMATION_DEFINITIONS: Record<FormationType, FormationLayout> = {
     { id: 'rcb', label: 'DFC', line: 'DEF', topRatio: 0.75, leftRatio: 0.63 },
     { id: 'lcb', label: 'DFC', line: 'DEF', topRatio: 0.75, leftRatio: 0.37 },
     { id: 'lb', label: 'LI', line: 'DEF', topRatio: 0.75, leftRatio: 0.12 },
-    { id: 'rdm', label: 'MCD', line: 'MID', topRatio: 0.58, leftRatio: 0.63 }, // MCDs
+    { id: 'rdm', label: 'MCD', line: 'MID', topRatio: 0.58, leftRatio: 0.63 },
     { id: 'ldm', label: 'MCD', line: 'MID', topRatio: 0.58, leftRatio: 0.37 },
-    { id: 'ram', label: 'MPD', line: 'MID', topRatio: 0.38, leftRatio: 0.85 }, // MPs
+    { id: 'ram', label: 'MPD', line: 'MID', topRatio: 0.38, leftRatio: 0.85 },
     { id: 'cam', label: 'MCO', line: 'MID', topRatio: 0.38, leftRatio: 0.5 },
     { id: 'lam', label: 'MPI', line: 'MID', topRatio: 0.38, leftRatio: 0.15 },
-    { id: 'st', label: 'DC', line: 'FWD', topRatio: 0.15, leftRatio: 0.5 }, // DC
+    { id: 'st', label: 'DC', line: 'FWD', topRatio: 0.15, leftRatio: 0.5 },
   ],
   "4-3-3": [
     { id: 'gk', label: 'POR', line: 'GK', topRatio: 0.92, leftRatio: 0.5 },
@@ -53,9 +56,9 @@ const FORMATION_DEFINITIONS: Record<FormationType, FormationLayout> = {
     { id: 'rcb', label: 'DFC', line: 'DEF', topRatio: 0.75, leftRatio: 0.63 },
     { id: 'lcb', label: 'DFC', line: 'DEF', topRatio: 0.75, leftRatio: 0.37 },
     { id: 'lb', label: 'LI', line: 'DEF', topRatio: 0.75, leftRatio: 0.12 },
-    { id: 'rcm', label: 'MC', line: 'MID', topRatio: 0.5, leftRatio: 0.78 }, // MCs más abiertos
+    { id: 'rcm', label: 'MC', line: 'MID', topRatio: 0.5, leftRatio: 0.78 },
     { id: 'cm', label: 'MC', line: 'MID', topRatio: 0.5, leftRatio: 0.5 },
-    { id: 'lcm', label: 'MC', line: 'MID', topRatio: 0.5, leftRatio: 0.22 }, // MCs más abiertos
+    { id: 'lcm', label: 'MC', line: 'MID', topRatio: 0.5, leftRatio: 0.22 },
     { id: 'rw', label: 'ED', line: 'FWD', topRatio: 0.22, leftRatio: 0.88 },
     { id: 'st', label: 'DC', line: 'FWD', topRatio: 0.22, leftRatio: 0.5 },
     { id: 'lw', label: 'EI', line: 'FWD', topRatio: 0.22, leftRatio: 0.12 },
@@ -64,16 +67,144 @@ const FORMATION_DEFINITIONS: Record<FormationType, FormationLayout> = {
 // --- FIN DEFINICIONES ---
 
 export default function MatchAnalysisScreen() {
-  const params = useLocalSearchParams<{ matchUrl: string; matchIdentifier?: string }>();
+  const PLAYERS_CACHE_KEY = 'playersGlobalCache';
+  const TACTICAL_LINEUPS_CACHE_KEY = 'tacticalLineupsCache';
+
+  const normalizeString = (str: string | null | undefined): string => {
+    return (str || '').toLowerCase().trim().replace(/\s+/g, '_');
+  };
+
+  const updatePlayersCache = async (
+    newPlayers: PlayerInfo[],
+    teamTier: TeamTierType | null | undefined,
+    teamManagerName: string | null | undefined
+  ) => {
+    if (!isTierSOrSRed(teamTier)) {
+      return;
+    }
+    try {
+      const existingCacheJson = await AsyncStorage.getItem(PLAYERS_CACHE_KEY);
+      const cache: Record<string, { name: string | null; isManager?: boolean }> = existingCacheJson
+        ? JSON.parse(existingCacheJson)
+        : {};
+      let cacheWasUpdated = false;
+
+      if (newPlayers && newPlayers.length > 0) {
+        for (const player of newPlayers) {
+          if (!player.name) continue;
+          const playerId = normalizeString(player.name);
+          if (!cache[playerId]) {
+            cache[playerId] = { name: player.name };
+            cacheWasUpdated = true;
+            console.log(`[CacheGlobal] Jugador Agregado: ${playerId}`);
+          }
+        }
+      }
+
+      if (teamManagerName) {
+        const managerId = normalizeString(teamManagerName);
+        if (!cache[managerId]) {
+          cache[managerId] = { name: teamManagerName, isManager: true };
+          cacheWasUpdated = true;
+          console.log(`[CacheGlobal] Entrenador Agregado: ${managerId}`);
+        }
+      }
+
+      if (cacheWasUpdated) {
+        await AsyncStorage.setItem(PLAYERS_CACHE_KEY, JSON.stringify(cache));
+        console.log('[CacheGlobal] Caché global (jugadores/entrenadores) actualizado en AsyncStorage.');
+      }
+    } catch (error) {
+      console.error('Error al actualizar el caché de jugadores/entrenadores:', error);
+    }
+  };
+
+  const saveTacticalLineup = async (matchId: string, formation: FormationType, lineup: Record<string, PlayerInfo | null>) => {
+    if (!matchId || !formation || !lineup || Object.keys(lineup).length === 0) return;
+    // Solo guardar si hay al menos un jugador colocado (además del GK si se autocompleta)
+    const hasPlacedPlayers = Object.values(lineup).some(p => p !== null);
+    if (!hasPlacedPlayers) {
+        console.log(`[TacticalLineup] No se guardó para ${matchId} porque no hay jugadores colocados.`);
+        return;
+    }
+
+    try {
+      const existingLineupsJson = await AsyncStorage.getItem(TACTICAL_LINEUPS_CACHE_KEY);
+      const lineupsCache: Record<string, { formation: FormationType; placedPlayers: Record<string, PlayerInfo | null> }> = existingLineupsJson
+        ? JSON.parse(existingLineupsJson)
+        : {};
+
+      lineupsCache[matchId] = { formation, placedPlayers: lineup };
+      await AsyncStorage.setItem(TACTICAL_LINEUPS_CACHE_KEY, JSON.stringify(lineupsCache));
+      console.log(`[TacticalLineup] Alineación guardada para ${matchId}`);
+    } catch (error) {
+      console.error('Error al guardar la alineación táctica:', error);
+    }
+  };
+
+  const loadTacticalLineup = async (matchId: string, teamFocus: 'home' | 'away') => {
+    if (!matchId) return;
+    // Determinar la clave correcta para cargar basada en el foco actual y si es un partido de dos TierS
+    const homeIsS = isTierSOrSRed(homeTeamActualTier); // Necesita los tiers actuales, puede ser problemático si se llama antes de que se establezcan
+    const awayIsS = isTierSOrSRed(awayTeamActualTier);
+    let loadKey = matchId;
+
+    // Esta lógica de carga diferenciada es compleja aquí porque los tiers pueden no estar listos.
+    // Simplificación: Cargar la clave base. Si se guardaron diferenciadas, el usuario las verá al cambiar de equipo.
+    // O, si se quiere una carga más inteligente, `loadTacticalLineup` debería llamarse DESPUÉS de que los tiers estén definidos.
+    // Por ahora, cargaremos la clave base o la específica del foco si es relevante.
+    if (homeIsS && awayIsS) { // Si ambos son TierS, la clave guardada podría ser específica del equipo
+        loadKey = teamFocus === 'home' ? matchId + "_home" : matchId + "_away";
+    }
+
+
+    try {
+      const existingLineupsJson = await AsyncStorage.getItem(TACTICAL_LINEUPS_CACHE_KEY);
+      if (existingLineupsJson) {
+        const lineupsCache: Record<string, { formation: FormationType; placedPlayers: Record<string, PlayerInfo | null> }> = JSON.parse(existingLineupsJson);
+        
+        let lineupToLoad = lineupsCache[loadKey];
+        // Fallback a la clave base si la específica no se encuentra (ej. primera carga del partido)
+        if (!lineupToLoad && (homeIsS && awayIsS)) {
+            lineupToLoad = lineupsCache[matchId];
+        }
+
+        if (lineupToLoad) {
+          const { formation, placedPlayers: loadedPlacedPlayers } = lineupToLoad;
+          setSelectedFormation(formation); 
+          setPlacedPlayers(loadedPlacedPlayers); 
+          console.log(`[TacticalLineup] Alineación cargada para ${loadKey}: Formación ${formation}`);
+          return true; // Indicar que se cargó una alineación
+        }
+      }
+      return false; // Indicar que no se cargó nada
+    } catch (error) {
+      console.error('Error al cargar la alineación táctica:', error);
+      return false;
+    }
+  };
+
+
+  const params = useLocalSearchParams<{
+    matchUrl: string;
+    matchIdentifier?: string;
+    teamAName?: string;
+    teamATier?: string;
+    teamBName?: string;
+    teamBTier?: string;
+  }>();
   const router = useRouter();
   const matchUrl = params.matchUrl ? decodeURIComponent(params.matchUrl) : undefined;
   const matchIdentifier = params.matchIdentifier ? decodeURIComponent(params.matchIdentifier) : 'Partido';
 
   const [analysisData, setAnalysisData] = useState<MatchAnalysisDetails | null>(null);
+  const [homeTeamActualTier, setHomeTeamActualTier] = useState<TeamTierType | null | undefined>(undefined);
+  const [awayTeamActualTier, setAwayTeamActualTier] = useState<TeamTierType | null | undefined>(undefined);
+
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [selectedFormation, setSelectedFormation] = useState<FormationType>("4-2-3-1"); // Establecer 4-2-3-1 por defecto
+  const [selectedFormation, setSelectedFormation] = useState<FormationType>("4-2-3-1");
   
   const [playerToPlace, setPlayerToPlace] = useState<PlayerInfo | null>(null);
   const [placedPlayers, setPlacedPlayers] = useState<Record<string, PlayerInfo | null>>({});
@@ -81,56 +212,163 @@ export default function MatchAnalysisScreen() {
   const [currentTeamFocus, setCurrentTeamFocus] = useState<'home' | 'away'>('home');
   const [homeLineupSnapshot, setHomeLineupSnapshot] = useState<Record<string, PlayerInfo | null> | null>(null);
 
+  const isTierSOrSRed = (tier: TeamTierType | null | undefined): boolean => {
+    return tier === "TierS" || tier === "TierSred";
+  };
+
+  // Efecto para inicializar el tablero cuando cambia la formación
+  // Este efecto ahora es más simple, solo inicializa si no se cargó nada.
   useEffect(() => {
     if (selectedFormation) {
-      const initialSlots: Record<string, PlayerInfo | null> = {};
-      FORMATION_DEFINITIONS[selectedFormation].forEach(slot => {
-        initialSlots[slot.id] = null;
-      });
-      setPlacedPlayers(initialSlots);
-      setPlayerToPlace(null);
-      setCurrentTeamFocus('home'); // Siempre resetear a 'home' al cambiar formación
-      setHomeLineupSnapshot(null); // Limpiar snapshot al cambiar formación
+        // Si placedPlayers está vacío (o no tiene la estructura de la formación actual), inicializar.
+        // Esto permite que loadTacticalLineup establezca los jugadores primero.
+        const currentFormationSlots = FORMATION_DEFINITIONS[selectedFormation].map(s => s.id);
+        const placedPlayerKeysMatchFormation = currentFormationSlots.every(slotId => slotId in placedPlayers);
+
+        if (Object.keys(placedPlayers).length === 0 || !placedPlayerKeysMatchFormation) {
+            const initialSlots: Record<string, PlayerInfo | null> = {};
+            FORMATION_DEFINITIONS[selectedFormation].forEach(slot => {
+                initialSlots[slot.id] = null;
+            });
+            setPlacedPlayers(initialSlots);
+        }
+        setPlayerToPlace(null);
+        setHomeLineupSnapshot(null);
     } else {
       setPlacedPlayers({});
     }
   }, [selectedFormation]);
 
+
+  // Efecto principal para cargar datos del partido y alineaciones
   useEffect(() => {
     if (!matchUrl) {
       setError("No se proporcionó la URL del partido para el análisis.");
       setIsLoading(false);
-      Alert.alert("Error", "No se pudo cargar el análisis: URL del partido no encontrada.", [
-        { text: "OK", onPress: () => router.back() }
-      ]);
       return;
     }
 
-    const fetchAnalysis = async () => {
+    const fetchAndLoad = async () => {
       setIsLoading(true);
+      setAnalysisData(null);
       setError(null);
+      
+      // Primero, determinar los tiers para saber cómo cargar/guardar
+      const pTeamAName = params.teamAName ? decodeURIComponent(params.teamAName) : undefined;
+      const pTeamATier = params.teamATier ? params.teamATier as TeamTierType : null;
+      const pTeamBName = params.teamBName ? decodeURIComponent(params.teamBName) : undefined;
+      const pTeamBTier = params.teamBTier ? params.teamBTier as TeamTierType : null;
+
+      // Scrapea los datos para obtener nombres reales y compararlos
+      let tempAnalysisData: MatchAnalysisDetails | null = null;
       try {
-        const data = await scrapeMatchAnalysis(matchUrl);
-        if (data.error) {
-          setError(data.error);
-          Alert.alert("Error de Análisis", data.error, [
-            { text: "OK", onPress: () => router.back() }
-          ]);
-        }
-        setAnalysisData(data);
+          tempAnalysisData = await scrapeMatchAnalysis(matchUrl);
+          if (tempAnalysisData.error) {
+              setError(tempAnalysisData.error);
+              setIsLoading(false);
+              return;
+          }
       } catch (e: any) {
-        const errorMessage = `Error al obtener el análisis del partido: ${e.message}`;
-        setError(errorMessage);
-        Alert.alert("Error Crítico", errorMessage, [
-          { text: "OK", onPress: () => router.back() }
-        ]);
-      } finally {
-        setIsLoading(false);
+          setError(`Error al obtener el análisis del partido: ${e.message}`);
+          setIsLoading(false);
+          return;
       }
+
+      let determinedHomeTier: TeamTierType | null | undefined = null;
+      let determinedAwayTier: TeamTierType | null | undefined = null;
+
+      if (tempAnalysisData.homeTeamName && tempAnalysisData.awayTeamName && pTeamAName && pTeamBName) {
+        const homeNameMatchesA = tempAnalysisData.homeTeamName.includes(pTeamAName) || (pTeamAName && pTeamAName.includes(tempAnalysisData.homeTeamName));
+        // const homeNameMatchesB = tempAnalysisData.homeTeamName.includes(pTeamBName) || (pTeamBName && pTeamBName.includes(tempAnalysisData.homeTeamName)); // No necesario si A es home
+
+        if (homeNameMatchesA) {
+          determinedHomeTier = pTeamATier;
+          determinedAwayTier = pTeamBTier;
+        } else { // Asumir que B es home si A no lo es
+          determinedHomeTier = pTeamBTier;
+          determinedAwayTier = pTeamATier;
+        }
+      }
+      // Establecer los tiers ANTES de intentar cargar la alineación táctica específica del equipo
+      setHomeTeamActualTier(determinedHomeTier);
+      setAwayTeamActualTier(determinedAwayTier);
+      
+      // Determinar el foco inicial basado en tiers (esto se moverá a su propio useEffect)
+      let initialFocus: 'home' | 'away' = 'home';
+      if (isTierSOrSRed(determinedHomeTier) && !isTierSOrSRed(determinedAwayTier)) {
+        initialFocus = 'home';
+      } else if (!isTierSOrSRed(determinedHomeTier) && isTierSOrSRed(determinedAwayTier)) {
+        initialFocus = 'away';
+      }
+      setCurrentTeamFocus(initialFocus); // Establecer el foco antes de cargar
+
+      // Ahora cargar la alineación táctica
+      if (matchUrl) {
+        await loadTacticalLineup(matchUrl, initialFocus);
+      }
+      
+      // Finalmente, establecer los datos del análisis y actualizar caché de jugadores
+      setAnalysisData(tempAnalysisData);
+      if (tempAnalysisData.homePlayers) {
+        await updatePlayersCache(tempAnalysisData.homePlayers, determinedHomeTier, tempAnalysisData.homeManager);
+      }
+      if (tempAnalysisData.awayPlayers) {
+        await updatePlayersCache(tempAnalysisData.awayPlayers, determinedAwayTier, tempAnalysisData.awayManager);
+      }
+      setIsLoading(false);
     };
 
-    fetchAnalysis();
-  }, [matchUrl, router]);
+    fetchAndLoad();
+  }, [matchUrl, params.teamAName, params.teamATier, params.teamBName, params.teamBTier]); // Dependencias clave para la carga inicial
+
+
+  // Efecto para ajustar el foco del equipo basado en los tiers (después de que se establezcan)
+  useEffect(() => {
+    if (homeTeamActualTier === undefined || awayTeamActualTier === undefined) return;
+
+    const homeIsS = isTierSOrSRed(homeTeamActualTier);
+    const awayIsS = isTierSOrSRed(awayTeamActualTier);
+
+    let newFocus = currentTeamFocus; // Mantener el foco actual si es posible
+    if (homeIsS && !awayIsS) {
+      newFocus = 'home';
+    } else if (!homeIsS && awayIsS) {
+      newFocus = 'away';
+    } else if (!homeIsS && !awayIsS) { // Si ninguno es S, default a home pero el tablero estará deshabilitado
+      newFocus = 'home';
+    }
+    // Si ambos son S, el foco se mantiene o se establece en 'home' por defecto si es la primera carga.
+    // La carga de la alineación táctica ya intentó cargar para el foco inicial.
+    setCurrentTeamFocus(newFocus);
+
+  }, [homeTeamActualTier, awayTeamActualTier]);
+
+
+  // Guardar alineación al desmontar el componente
+  useEffect(() => {
+    return () => {
+      if (matchUrl && selectedFormation && Object.keys(placedPlayers).length > 0) {
+        const homeIsS = isTierSOrSRed(homeTeamActualTier);
+        const awayIsS = isTierSOrSRed(awayTeamActualTier);
+        let keyToSave = matchUrl;
+
+        if (homeIsS && awayIsS) { // Si ambos son TierS, guardar con clave específica del foco
+            keyToSave = currentTeamFocus === 'home' ? matchUrl + "_home" : matchUrl + "_away";
+        } else if (!homeIsS && !awayIsS) { // No guardar si ninguno es TierS
+            return;
+        }
+        // Si solo uno es TierS, se guarda con la clave base (matchUrl),
+        // y el currentTeamFocus ya debería estar en ese equipo TierS.
+        
+        // Solo guardar si el equipo en foco es TierS o TierSred
+        const currentFocusIsTierS = (currentTeamFocus === 'home' && homeIsS) || (currentTeamFocus === 'away' && awayIsS);
+        if (currentFocusIsTierS) {
+            saveTacticalLineup(keyToSave, selectedFormation, placedPlayers);
+        }
+      }
+    };
+  }, [matchUrl, selectedFormation, placedPlayers, homeTeamActualTier, awayTeamActualTier, currentTeamFocus]);
+
 
   const initializeBoardForCurrentFormation = useCallback(() => {
     if (selectedFormation) {
@@ -151,14 +389,30 @@ export default function MatchAnalysisScreen() {
   };
 
   const handleSwitchToAwayTeam = () => {
+    const homeIsS = isTierSOrSRed(homeTeamActualTier);
+    if (matchUrl && selectedFormation && homeIsS) {
+        saveTacticalLineup(matchUrl + "_home", selectedFormation, placedPlayers);
+    }
     setCurrentTeamFocus('away');
-    setHomeLineupSnapshot(placedPlayers); // Guardar la alineación local actual
-    initializeBoardForCurrentFormation();
+    setHomeLineupSnapshot(placedPlayers); 
+    // Intentar cargar la alineación del equipo visitante si existe
+    if (matchUrl) loadTacticalLineup(matchUrl, 'away').then(loaded => {
+        if (!loaded) initializeBoardForCurrentFormation(); // Inicializar si no se cargó nada
+    });
+    else initializeBoardForCurrentFormation();
   };
 
   const handleSwitchToHomeTeam = () => {
+    const awayIsS = isTierSOrSRed(awayTeamActualTier);
+    if (matchUrl && selectedFormation && awayIsS && homeLineupSnapshot) { 
+        saveTacticalLineup(matchUrl + "_away", selectedFormation, placedPlayers);
+    }
     setCurrentTeamFocus('home');
-    initializeBoardForCurrentFormation();
+    // Intentar cargar la alineación del equipo local si existe
+    if (matchUrl) loadTacticalLineup(matchUrl, 'home').then(loaded => {
+        if (!loaded) initializeBoardForCurrentFormation();
+    });
+    else initializeBoardForCurrentFormation();
   };
 
   const areAllSlotsFilled = useCallback(() => {
@@ -169,37 +423,34 @@ export default function MatchAnalysisScreen() {
 
   const handleSelectPlayerFromList = (player: PlayerInfo) => {
     if (playerToPlace && playerToPlace.name === player.name && playerToPlace.number === player.number) {
-      setPlayerToPlace(null); // Deseleccionar si se vuelve a tocar el mismo jugador seleccionado
+      setPlayerToPlace(null); 
     } else {
-      // Si el jugador seleccionado de la lista ya estaba en el campo (porque fue levantado del campo),
-      // esta lógica lo quita de su slot anterior.
       const slotIdOfSelectedPlayer = Object.keys(placedPlayers).find(
         slotId => placedPlayers[slotId]?.name === player.name && placedPlayers[slotId]?.number === player.number
       );
       if (slotIdOfSelectedPlayer) {
         setPlacedPlayers(prev => ({ ...prev, [slotIdOfSelectedPlayer]: null }));
       }
-      setPlayerToPlace(player); // Seleccionar el nuevo jugador
+      setPlayerToPlace(player); 
     }
   };
 
   const handleSelectSlotOnField = (slotId: string) => {
-    if (playerToPlace) { // Si hay un jugador "en mano" para colocar
+    if (playerToPlace) { 
       let newPlacedPlayers = { ...placedPlayers };
-      // Quitar cualquier instancia previa del jugador que se va a colocar (si se está moviendo)
       Object.keys(newPlacedPlayers).forEach(sId => {
         if (newPlacedPlayers[sId]?.name === playerToPlace.name && newPlacedPlayers[sId]?.number === playerToPlace.number) {
           newPlacedPlayers[sId] = null;
         }
       });
       
-      newPlacedPlayers[slotId] = playerToPlace; // Colocar el jugador en el slot seleccionado
+      newPlacedPlayers[slotId] = playerToPlace; 
       setPlacedPlayers(newPlacedPlayers);
-      setPlayerToPlace(null); // Limpiar el jugador "en mano"
-    } else { // Si no hay jugador "en mano", se está intentando levantar uno del campo
-      if (placedPlayers[slotId]) { // Si hay un jugador en el slot clickeado
-        setPlayerToPlace(placedPlayers[slotId]); // Ponerlo "en mano"
-        setPlacedPlayers(prev => ({ ...prev, [slotId]: null })); // Quitarlo del slot
+      setPlayerToPlace(null); 
+    } else { 
+      if (placedPlayers[slotId]) { 
+        setPlayerToPlace(placedPlayers[slotId]); 
+        setPlacedPlayers(prev => ({ ...prev, [slotId]: null })); 
       }
     }
   };
@@ -218,7 +469,7 @@ export default function MatchAnalysisScreen() {
     return `${firstNameInitial}. ${lastName}`;
   };
 
-  if (isLoading && !analysisData) {
+  if (isLoading && !analysisData && homeTeamActualTier === undefined) { 
     return (
       <ThemedView style={styles.centered}>
         <ActivityIndicator size="large" />
@@ -228,30 +479,48 @@ export default function MatchAnalysisScreen() {
   }
 
   const renderPlayerList = () => {
-    const actualPlayers = currentTeamFocus === 'home' ? analysisData?.homePlayers : analysisData?.awayPlayers;
-    const actualTitle = currentTeamFocus === 'home' 
-      ? `Alineación ${analysisData?.homeTeamName || 'Local'}`
-      : `Alineación ${analysisData?.awayTeamName || 'Visitante'}`;
+    const homeIsS = isTierSOrSRed(homeTeamActualTier);
+    const awayIsS = isTierSOrSRed(awayTeamActualTier);
 
-    if (!actualPlayers || actualPlayers.length === 0) {
-      return null;
+    let playersToList: PlayerInfo[] | undefined = [];
+    let listTitle = "";
+    let showListForCurrentFocus = false;
+
+    if (currentTeamFocus === 'home' && homeIsS) {
+      playersToList = analysisData?.homePlayers;
+      listTitle = `Alineación ${analysisData?.homeTeamName || 'Local'} (TierS)`;
+      showListForCurrentFocus = true;
+    } else if (currentTeamFocus === 'away' && awayIsS) {
+      playersToList = analysisData?.awayPlayers;
+      listTitle = `Alineación ${analysisData?.awayTeamName || 'Visitante'} (TierS)`;
+      showListForCurrentFocus = true;
     }
+
+    if (!showListForCurrentFocus && analysisData) { // Solo mostrar si hay analysisData
+      const teamName = currentTeamFocus === 'home' ? analysisData?.homeTeamName : analysisData?.awayTeamName;
+      return (
+        <View style={styles.playerListContainer}>
+          {teamName && <ThemedText type="label" style={styles.playerListTitle}>{teamName}</ThemedText>}
+          <ThemedText>Análisis táctico no disponible para este equipo (no es TierS/SRed).</ThemedText>
+        </View>
+      );
+    }
+    if (!analysisData) return null; // No renderizar nada si no hay datos de análisis
 
     const placedPlayerKeys = new Set(
       Object.values(placedPlayers)
         .filter(p => p !== null)
         .map(p => `${p!.name}_${p!.number}`)
     );
-
-    // Filtrar jugadores: mostrar si no están en el campo O si es el jugador actualmente seleccionado (playerToPlace)
-    const displayablePlayers = actualPlayers.filter(p => 
+    
+    const displayablePlayers = (playersToList || []).filter(p =>
         !placedPlayerKeys.has(`${p.name}_${p.number}`) || 
         (playerToPlace && playerToPlace.name === p.name && playerToPlace.number === p.number)
     );
 
     return (
       <View style={styles.playerListContainer}>
-        <ThemedText type="label" style={styles.playerListTitle}>{actualTitle}</ThemedText>
+        <ThemedText type="label" style={styles.playerListTitle}>{listTitle}</ThemedText>
         <View style={styles.playerItemsWrapper}>
           {displayablePlayers.map((player, index) => {
             const isSelected = playerToPlace?.name === player.name && playerToPlace?.number === player.number;
@@ -280,10 +549,23 @@ export default function MatchAnalysisScreen() {
   };
 
   const RenderTacticalBoard = () => {
+    const homeIsS = isTierSOrSRed(homeTeamActualTier);
+    const awayIsS = isTierSOrSRed(awayTeamActualTier);
+
+    if (!homeIsS && !awayIsS && analysisData) { 
+      return <ThemedText style={styles.tacticalSchemePlaceholderText}>Análisis táctico no disponible (ningún equipo es TierS/SRed).</ThemedText>;
+    }
+    if (currentTeamFocus === 'home' && !homeIsS && analysisData) {
+      return <ThemedText style={styles.tacticalSchemePlaceholderText}>Análisis táctico no disponible para {analysisData?.homeTeamName} (no es TierS/SRed).</ThemedText>;
+    }
+    if (currentTeamFocus === 'away' && !awayIsS && analysisData) {
+      return <ThemedText style={styles.tacticalSchemePlaceholderText}>Análisis táctico no disponible para {analysisData?.awayTeamName} (no es TierS/SRed).</ThemedText>;
+    }
+
     if (!selectedFormation || fieldDimensions.width === 0) {
       return (
         <ThemedText style={styles.tacticalSchemePlaceholderText}>
-          {selectedFormation ? "Calculando campo..." : "Selecciona una formación"}
+          {selectedFormation ? (isLoading ? "Cargando..." : "Calculando campo...") : "Selecciona una formación"}
         </ThemedText>
       );
     }
@@ -357,6 +639,9 @@ export default function MatchAnalysisScreen() {
     );
   };
 
+  const homeIsS = isTierSOrSRed(homeTeamActualTier);
+  const awayIsS = isTierSOrSRed(awayTeamActualTier);
+
   return (
     <ThemedView style={styles.container}>
       <Stack.Screen options={{ title: `Análisis: ${matchIdentifier}` }} />
@@ -375,7 +660,7 @@ export default function MatchAnalysisScreen() {
                 styles.formationButton,
                 selectedFormation === formation && styles.formationButtonSelected,
               ]}
-              onPress={() => setSelectedFormation(formation)}
+              onPress={() => setSelectedFormation(formation)} // Esto ahora solo cambia la formación, la carga se maneja en useEffect
             >
               <ThemedText
                 style={[
@@ -395,14 +680,14 @@ export default function MatchAnalysisScreen() {
           darkColor="#1c1c1e"
           onLayout={onFieldLayout}
         >
-          {isLoading && !analysisData ? (
+          {isLoading && !analysisData && homeTeamActualTier === undefined ? ( 
              <ActivityIndicator size="small" />
           ) : (
             <RenderTacticalBoard />
           )}
         </ThemedView>
         
-        {analysisData && !analysisData.error && !isLoading && (
+        {analysisData && !analysisData.error && !isLoading && (homeIsS || awayIsS) && ( 
           <>
             {renderPlayerList()}
           </>
@@ -411,42 +696,91 @@ export default function MatchAnalysisScreen() {
             <ThemedText style={{textAlign: 'center', marginTop: 20}}>No hay datos de análisis para mostrar.</ThemedText>
         )}
 
-        {selectedFormation && areAllSlotsFilled() && currentTeamFocus === 'home' && 
+        {selectedFormation && areAllSlotsFilled() && currentTeamFocus === 'home' &&
+         homeIsS && awayIsS && 
          analysisData?.awayPlayers && analysisData.awayPlayers.length > 0 && (
           <TouchableOpacity onPress={handleSwitchToAwayTeam} style={styles.switchTeamButton}>
-            <ThemedText style={styles.switchTeamButtonText}>Crear Esquema Visitante</ThemedText>
+            <ThemedText style={styles.switchTeamButtonText}>Crear Esquema Visitante (TierS)</ThemedText>
           </TouchableOpacity>
         )}
 
-        {selectedFormation && currentTeamFocus === 'away' && 
+        {selectedFormation && currentTeamFocus === 'away' &&
+         homeIsS && awayIsS && 
          analysisData?.homePlayers && analysisData.homePlayers.length > 0 && (
           <TouchableOpacity onPress={handleSwitchToHomeTeam} style={styles.switchTeamButton}>
-            <ThemedText style={styles.switchTeamButtonText}>Ver Esquema Local</ThemedText>
+            <ThemedText style={styles.switchTeamButtonText}>Ver Esquema Local (TierS)</ThemedText>
           </TouchableOpacity>
         )}
         
-        {/* Botón para ir a la siguiente pantalla después de completar ambos esquemas */}
-        {selectedFormation && areAllSlotsFilled() && currentTeamFocus === 'away' && analysisData && homeLineupSnapshot && (
-          <TouchableOpacity 
+        {selectedFormation && areAllSlotsFilled() && currentTeamFocus === 'home' &&
+         homeIsS && !awayIsS && analysisData && (
+          <TouchableOpacity
             onPress={() => {
+              if (matchUrl) { 
+                saveTacticalLineup(matchUrl, selectedFormation, placedPlayers);
+              }
+              router.push({
+                pathname: '/tactical-summary',
+                params: {
+                  lineup1: JSON.stringify(placedPlayers), 
+                  team1Name: analysisData.homeTeamName || 'Local',
+                  formation: selectedFormation,
+                }
+              });
+            }}
+            style={[styles.switchTeamButton, styles.nextScreenButton]}>
+            <ThemedText style={styles.switchTeamButtonText}>Siguiente (Resumen)</ThemedText>
+          </TouchableOpacity>
+        )}
+
+        {selectedFormation && areAllSlotsFilled() && currentTeamFocus === 'away' &&
+         !homeIsS && awayIsS && analysisData && (
+          <TouchableOpacity
+            onPress={() => {
+              if (matchUrl) { 
+                saveTacticalLineup(matchUrl, selectedFormation, placedPlayers);
+              }
+              router.push({
+                pathname: '/tactical-summary',
+                params: {
+                  lineup1: JSON.stringify(placedPlayers), 
+                  team1Name: analysisData.awayTeamName || 'Visitante',
+                  formation: selectedFormation,
+                }
+              });
+            }}
+            style={[styles.switchTeamButton, styles.nextScreenButton]}>
+            <ThemedText style={styles.switchTeamButtonText}>Siguiente (Resumen)</ThemedText>
+          </TouchableOpacity>
+        )}
+
+        {selectedFormation && areAllSlotsFilled() && currentTeamFocus === 'away' &&
+         homeIsS && awayIsS && 
+         analysisData && homeLineupSnapshot && (
+          <TouchableOpacity
+            onPress={() => {
+              if (matchUrl) { 
+                saveTacticalLineup(matchUrl + "_away", selectedFormation, placedPlayers);
+                // La del local ya se guardó al cambiar a visitante
+              }
               router.push({
                 pathname: '/tactical-summary',
                 params: {
                   homeLineup: JSON.stringify(homeLineupSnapshot),
-                  awayLineup: JSON.stringify(placedPlayers), // placedPlayers es la alineación visitante en este punto
+                  awayLineup: JSON.stringify(placedPlayers),
                   formation: selectedFormation,
                   homeTeamName: analysisData.homeTeamName || 'Local',
                   awayTeamName: analysisData.awayTeamName || 'Visitante',
                 }
               });
-            }} 
+            }}
             style={[styles.switchTeamButton, styles.nextScreenButton]}>
-            <ThemedText style={styles.switchTeamButtonText}>Siguiente</ThemedText>
+            <ThemedText style={styles.switchTeamButtonText}>Siguiente (Resumen)</ThemedText>
           </TouchableOpacity>
         )}
 
 
-        {selectedFormation && Object.values(placedPlayers).some(p => p !== null) && (
+        {selectedFormation && Object.values(placedPlayers).some(p => p !== null) && (homeIsS || awayIsS) && ( 
           <TouchableOpacity onPress={handleClearBoard} style={styles.clearButton}>
             <ThemedText style={styles.clearButtonText}>Limpiar Esquema</ThemedText>
           </TouchableOpacity>
@@ -519,6 +853,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#757575',
     textAlign: 'center',
+    paddingHorizontal: 10,
   },
   fieldContainer: {
     width: '100%',

@@ -1,3 +1,4 @@
+// cabs/Users/Mauri/Desktop/CCC23/MayI/CCC23/app/tactical-summary.tsx
 import React, { useState, useCallback } from 'react';
 import { StyleSheet, View, ScrollView, ActivityIndicator } from 'react-native';
 import { Stack, useLocalSearchParams } from 'expo-router';
@@ -163,29 +164,57 @@ const TacticalBoardDisplay: React.FC<TacticalBoardDisplayProps> = ({ lineup, for
 };
 
 export default function TacticalSummaryScreen() {
-  const params = useLocalSearchParams<{ homeLineup: string; awayLineup: string; formation: string; homeTeamName: string; awayTeamName: string; }>();
+  const params = useLocalSearchParams<{
+    homeLineup?: string; // Para escenario de dos equipos
+    awayLineup?: string; // Para escenario de dos equipos
+    homeTeamName?: string;
+    awayTeamName?: string;
+    lineup1?: string;    // Para escenario de un solo equipo
+    team1Name?: string;
+    formation: string; // Común para ambos escenarios
+  }>();
 
-  const homeLineup = params.homeLineup ? JSON.parse(params.homeLineup) : null;
-  const awayLineup = params.awayLineup ? JSON.parse(params.awayLineup) : null;
   const formation = params.formation as FormationType | undefined;
-  const homeTeamName = params.homeTeamName || 'Local';
-  const awayTeamName = params.awayTeamName || 'Visitante';
 
-  if (!homeLineup || !awayLineup || !formation) {
+  // Parsear datos específicos del escenario
+  const homeLineupData = params.homeLineup ? JSON.parse(params.homeLineup) : null;
+  const awayLineupData = params.awayLineup ? JSON.parse(params.awayLineup) : null;
+  const singleLineupData = params.lineup1 ? JSON.parse(params.lineup1) : null;
+
+  const homeTeamName = params.homeTeamName || 'Local'; // Usado si homeLineupData existe
+  const awayTeamName = params.awayTeamName || 'Visitante'; // Usado si awayLineupData existe
+  const singleTeamName = params.team1Name || 'Equipo'; // Usado si singleLineupData existe
+
+  if (!formation) {
     return (
       <ThemedView style={styles.container}>
-        <ThemedText>Error: Faltan datos de alineación o formación.</ThemedText>
+        <ThemedText>Error: Formación no especificada.</ThemedText>
       </ThemedView>
     );
   }
 
-  return (
-    <ScrollView contentContainerStyle={styles.scrollContainer}>
-      <Stack.Screen options={{ title: 'Resumen Táctico' }} />
-      <TacticalBoardDisplay lineup={homeLineup} formationType={formation} teamName={homeTeamName} />
-      <TacticalBoardDisplay lineup={awayLineup} formationType={formation} teamName={awayTeamName} />
-    </ScrollView>
-  );
+  if (singleLineupData) { // Escenario de un solo equipo
+    return (
+      <ScrollView contentContainerStyle={styles.scrollContainer}>
+        <Stack.Screen options={{ title: `Resumen: ${singleTeamName}` }} />
+        <TacticalBoardDisplay lineup={singleLineupData} formationType={formation} teamName={singleTeamName} />
+      </ScrollView>
+    );
+  } else if (homeLineupData && awayLineupData) { // Escenario de dos equipos
+    return (
+      <ScrollView contentContainerStyle={styles.scrollContainer}>
+        <Stack.Screen options={{ title: 'Resumen Táctico (Doble)' }} />
+        <TacticalBoardDisplay lineup={homeLineupData} formationType={formation} teamName={homeTeamName} />
+        <TacticalBoardDisplay lineup={awayLineupData} formationType={formation} teamName={awayTeamName} />
+      </ScrollView>
+    );
+  } else { // No hay datos suficientes para ningún escenario
+    return (
+      <ThemedView style={styles.container}>
+        <ThemedText>Error: Faltan datos de alineación para el resumen.</ThemedText>
+      </ThemedView>
+    );
+  }
 }
 
 const styles = StyleSheet.create({

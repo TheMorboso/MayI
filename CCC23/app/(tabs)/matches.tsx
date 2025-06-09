@@ -1,3 +1,4 @@
+// cabs/Users/Mauri/Desktop/CCC23/MayI/CCC23/app/(tabs)/matches.tsx
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, Button, Platform, ActivityIndicator, Alert, ScrollView, Modal, TouchableOpacity, FlatList, Image } from 'react-native'; // Agregado FlatList e Image
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -274,7 +275,14 @@ export default function MatchesScreen() {
       const matchIdentifier = `${matchItem.Team || 'Equipo'} vs ${matchItem.equipoContrario || 'Oponente'} (${matchItem.fecha})`;
       router.push({
         pathname: `/match-analysis`,
-        params: { matchUrl: encodeURIComponent(matchItem.match), matchIdentifier: encodeURIComponent(matchIdentifier) },
+        params: {
+          matchUrl: encodeURIComponent(matchItem.match),
+          matchIdentifier: encodeURIComponent(matchIdentifier),
+          teamAName: matchItem.Team, // Nombre del equipo principal de la fila
+          teamATier: matchItem.tier, // Tier del equipo principal
+          teamBName: matchItem.equipoContrario, // Nombre del oponente
+          teamBTier: matchItem.opponentTier, // Tier del oponente
+        },
       });
     } else {
       Alert.alert("Sin Enlace", "Este partido no tiene un enlace de detalles para analizar.");

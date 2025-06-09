@@ -1,3 +1,4 @@
+// config.tsx
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, Button, ActivityIndicator, ScrollView, TextInput, View, Alert, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -20,6 +21,20 @@ export default function ConfigScreen() {
   const [isSavingSeason, setIsSavingSeason] = useState(false);
   const SEASON_STORAGE_KEY = 'currentSeason';
   const TEAMS_STORAGE_KEY = 'myTeams';
+
+  // Estados para el JSON de jugadores/entrenadores
+  const PLAYERS_CACHE_KEY_CONFIG = 'playersGlobalCache';
+  const [isPlayersJsonVisible, setIsPlayersJsonVisible] = useState(false);
+  const [playersJsonData, setPlayersJsonData] = useState<string | null>(null);
+  const [isLoadingPlayersJson, setIsLoadingPlayersJson] = useState(false);
+
+  // Nuevos estados para el JSON de Alineaciones Tácticas
+  const TACTICAL_LINEUPS_CACHE_KEY_CONFIG = 'tacticalLineupsCache';
+  const [isTacticalLineupsJsonVisible, setIsTacticalLineupsJsonVisible] = useState(false);
+  const [tacticalLineupsJsonData, setTacticalLineupsJsonData] = useState<string | null>(null);
+  const [isLoadingTacticalLineupsJson, setIsLoadingTacticalLineupsJson] = useState(false);
+
+
   useEffect(() => {
     const loadSavedSeason = async () => {
       const savedSeason = await AsyncStorage.getItem(SEASON_STORAGE_KEY);
@@ -49,10 +64,64 @@ export default function ConfigScreen() {
           setJsonData(`No hay datos guardados bajo la clave "${TEAMS_STORAGE_KEY}".`);
         }
       } catch (e) {
-        setJsonData('Error al cargar los datos.');
+        setJsonData('Error al cargar los datos de equipos.');
       } finally {
         setIsLoading(false);
         setIsJsonVisible(true);
+      }
+    }
+  };
+
+  const handleTogglePlayersJsonData = async () => {
+    if (isPlayersJsonVisible) {
+      setIsPlayersJsonVisible(false);
+    } else {
+      setIsLoadingPlayersJson(true);
+      setPlayersJsonData(null);
+      try {
+        const existingPlayersJson = await AsyncStorage.getItem(PLAYERS_CACHE_KEY_CONFIG);
+        if (existingPlayersJson !== null) {
+          try {
+            const parsedJson = JSON.parse(existingPlayersJson);
+            setPlayersJsonData(JSON.stringify(parsedJson, null, 2));
+          } catch (parseError) {
+            setPlayersJsonData(existingPlayersJson); 
+          }
+        } else {
+          setPlayersJsonData(`No hay datos guardados bajo la clave "${PLAYERS_CACHE_KEY_CONFIG}".`);
+        }
+      } catch (e) {
+        setPlayersJsonData('Error al cargar los datos de jugadores/entrenadores.');
+      } finally {
+        setIsLoadingPlayersJson(false);
+        setIsPlayersJsonVisible(true);
+      }
+    }
+  };
+
+  const handleToggleTacticalLineupsJsonData = async () => {
+    if (isTacticalLineupsJsonVisible) {
+      setIsTacticalLineupsJsonVisible(false);
+    } else {
+      setIsLoadingTacticalLineupsJson(true);
+      setTacticalLineupsJsonData(null);
+      try {
+        const existingJson = await AsyncStorage.getItem(TACTICAL_LINEUPS_CACHE_KEY_CONFIG);
+        if (existingJson !== null) {
+          try {
+            const parsedJson = JSON.parse(existingJson);
+            setTacticalLineupsJsonData(JSON.stringify(parsedJson, null, 2));
+          } catch (parseError) {
+            setTacticalLineupsJsonData(existingJson);
+          }
+        } else {
+          setTacticalLineupsJsonData(`No hay datos guardados bajo la clave "${TACTICAL_LINEUPS_CACHE_KEY_CONFIG}".`);
+        }
+      } catch (e) {
+        setTacticalLineupsJsonData('Error al cargar los datos de alineaciones tácticas.');
+      } finally {
+        setIsLoadingTacticalLineupsJson(false);
+        setIsTacticalLineupsJsonVisible(true);
       }
     }
   };
@@ -74,6 +143,59 @@ export default function ConfigScreen() {
       setIsSavingSeason(false);
     }
   };
+
+  const handleDeletePlayersJson = async () => {
+    Alert.alert(
+      "Confirmar Eliminación",
+      "¿Estás seguro de que quieres eliminar todos los datos de jugadores/entrenadores guardados? Esta acción no se puede deshacer.",
+      [
+        {
+          text: "Cancelar",
+          style: "cancel"
+        },
+        {
+          text: "Eliminar Todo",
+          onPress: async () => {
+            try {
+              await AsyncStorage.removeItem(PLAYERS_CACHE_KEY_CONFIG);
+              setPlayersJsonData(`Datos de jugadores/entrenadores eliminados de "${PLAYERS_CACHE_KEY_CONFIG}".`);
+              Alert.alert("Éxito", "Todos los datos de jugadores/entrenadores han sido eliminados.");
+            } catch (e) {
+              Alert.alert("Error", "No se pudieron eliminar los datos de jugadores/entrenadores.");
+            }
+          },
+          style: "destructive"
+        }
+      ]
+    );
+  };
+
+  const handleDeleteTacticalLineupsJson = async () => {
+    Alert.alert(
+      "Confirmar Eliminación",
+      "¿Estás seguro de que quieres eliminar todas las alineaciones tácticas guardadas? Esta acción no se puede deshacer.",
+      [
+        {
+          text: "Cancelar",
+          style: "cancel"
+        },
+        {
+          text: "Eliminar Todo",
+          onPress: async () => {
+            try {
+              await AsyncStorage.removeItem(TACTICAL_LINEUPS_CACHE_KEY_CONFIG);
+              setTacticalLineupsJsonData(`Datos de alineaciones tácticas eliminados de "${TACTICAL_LINEUPS_CACHE_KEY_CONFIG}".`);
+              Alert.alert("Éxito", "Todas las alineaciones tácticas han sido eliminadas.");
+            } catch (e) {
+              Alert.alert("Error", "No se pudieron eliminar las alineaciones tácticas.");
+            }
+          },
+          style: "destructive"
+        }
+      ]
+    );
+  };
+
 
   return (
     <ThemedView style={styles.container}>
@@ -127,6 +249,57 @@ export default function ConfigScreen() {
         </ScrollView>
       ) }
 
+      <View style={styles.sectionContainer}>
+        <ThemedText type="subtitle" style={styles.sectionTitle}>Caché Global (Jugadores/Entrenadores)</ThemedText>
+        <View style={styles.playersJsonButtonsContainer}>
+          <Button
+            title={isPlayersJsonVisible ? "Ocultar JSON" : "Mostrar JSON"}
+            onPress={handleTogglePlayersJsonData}
+            color={Platform.OS === 'ios' ? Colors.light.tint : undefined}
+          />
+          <View style={{ width: 10 }} /> 
+          <Button
+            title="Eliminar JSON"
+            onPress={handleDeletePlayersJson}
+            color={Platform.OS === 'ios' ? (colorScheme === 'dark' ? Colors.dark.error : '#FF3B30') : '#FF3B30'}
+          />
+        </View>
+      </View>
+
+      {isPlayersJsonVisible && isLoadingPlayersJson && (
+        <ActivityIndicator size="large" style={styles.loader} />
+      )}
+      {isPlayersJsonVisible && !isLoadingPlayersJson && playersJsonData !== null && (
+        <ScrollView style={[styles.jsonContainer, { borderColor: colorScheme === 'dark' ? '#555' : '#ccc'}]}>
+          <ThemedText style={[styles.jsonText, { color: textColor }]}>{playersJsonData}</ThemedText>
+        </ScrollView>
+      )}
+
+      <View style={styles.sectionContainer}>
+        <ThemedText type="subtitle" style={styles.sectionTitle}>Alineaciones Tácticas Guardadas</ThemedText>
+        <View style={styles.playersJsonButtonsContainer}>
+          <Button
+            title={isTacticalLineupsJsonVisible ? "Ocultar JSON" : "Mostrar JSON"}
+            onPress={handleToggleTacticalLineupsJsonData}
+            color={Platform.OS === 'ios' ? Colors.light.tint : undefined}
+          />
+          <View style={{ width: 10 }} /> 
+          <Button
+            title="Eliminar JSON"
+            onPress={handleDeleteTacticalLineupsJson}
+            color={Platform.OS === 'ios' ? (colorScheme === 'dark' ? Colors.dark.error : '#FF3B30') : '#FF3B30'}
+          />
+        </View>
+      </View>
+
+      {isTacticalLineupsJsonVisible && isLoadingTacticalLineupsJson && (
+        <ActivityIndicator size="large" style={styles.loader} />
+      )}
+      {isTacticalLineupsJsonVisible && !isLoadingTacticalLineupsJson && tacticalLineupsJsonData !== null && (
+        <ScrollView style={[styles.jsonContainer, { borderColor: colorScheme === 'dark' ? '#555' : '#ccc'}]}>
+          <ThemedText style={[styles.jsonText, { color: textColor }]}>{tacticalLineupsJsonData}</ThemedText>
+        </ScrollView>
+      )}
     </ThemedView>
   );
 }
@@ -140,7 +313,7 @@ const styles = StyleSheet.create({
   },
   sectionContainer: {
     width: '90%',
-    marginBottom: 30,
+    marginBottom: 15, // Reducido para más secciones
     alignItems: 'center',
   },
   sectionTitle: {
@@ -168,13 +341,20 @@ const styles = StyleSheet.create({
   jsonContainer: {
     width: '90%',
     marginTop: 10,
-    marginBottom: 20,
+    marginBottom: 5, 
     padding: 10,
     borderWidth: 1,
     borderRadius: 5,
-    maxHeight: 300, 
+    maxHeight: 150, // Reducido para más secciones
   },
   jsonText: {
     fontSize: 14,
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace', 
+  },
+  playersJsonButtonsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-around', 
+    width: '100%', 
+    marginTop: 5,
   },
 });

@@ -1,3 +1,4 @@
+// cabs/Users/Mauri/Desktop/CCC23/MayI/CCC23/app/team-matches/[teamId].tsx
 import React, { useEffect, useState } from 'react';
 import { FlatList, ActivityIndicator, StyleSheet, View, Image, TouchableOpacity, Alert } from 'react-native'; // Importar Image, TouchableOpacity, Alert
 import { useLocalSearchParams, Stack, useRouter } from 'expo-router';
@@ -63,7 +64,14 @@ export default function TeamMatchesScreen() {
       const matchIdentifier = `${matchItem.Team || 'Equipo'} vs ${matchItem.equipoContrario || 'Oponente'} (${matchItem.fecha})`;
       router.push({
         pathname: `/match-analysis`,
-        params: { matchUrl: encodeURIComponent(matchItem.match), matchIdentifier: encodeURIComponent(matchIdentifier) },
+        params: {
+          matchUrl: encodeURIComponent(matchItem.match),
+          matchIdentifier: encodeURIComponent(matchIdentifier),
+          teamAName: matchItem.Team,
+          teamATier: matchItem.tier,
+          teamBName: matchItem.equipoContrario,
+          teamBTier: matchItem.opponentTier,
+        },
       });
     } else {
       Alert.alert("Sin Enlace", "Este partido no tiene un enlace de detalles para analizar.");
