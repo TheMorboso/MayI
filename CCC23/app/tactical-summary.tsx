@@ -1,14 +1,14 @@
 // c/Users/Mauri/Desktop/CCC23/MayI/CCC23/app/tactical-summary.tsx
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
-import { StyleSheet, View, ScrollView, ActivityIndicator, Button, Platform, Alert, TouchableOpacity } from 'react-native';
+import { StyleSheet, View, ScrollView, ActivityIndicator, Button, Platform, Alert } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { ThemedView } from '@/components/ThemedView';
 import { ThemedText } from '@/components/ThemedText';
-import { PlayerInfo } from '@/api/analisis';
+import { PlayerInfo } from '@/api/analisis'; 
 import { Colors } from '@/constants/Colors';
-import { PostScudettoMatchInfo } from '@/api/postscudetto';
+import { PostScudettoMatchInfo } from '@/api/postscudetto'; 
 import { TeamTierType } from '@/api/scraper';
 
 
@@ -23,7 +23,7 @@ type FormationLayout = FormationSlot[];
 const FORMATIONS_ARRAY = ["4-2-3-1", "4-4-2", "4-3-3", "3-4-2-1", "3-5-2", "4-3-1-2"] as const;
 type FormationType = typeof FORMATIONS_ARRAY[number];
 
-const ACTUAL_PLAYER_POSITIONS = [
+const ACTUAL_PLAYER_POSITIONS = [ 
   "POR", "DFC", "LD", "LI", "MC", "MCO", "MD", "MI", "ED", "EI", "DC", "SD", "PIV"
 ] as const;
 type ActualPlayerPositionType = typeof ACTUAL_PLAYER_POSITIONS[number];
@@ -48,11 +48,11 @@ const FORMATION_DEFINITIONS: Record<FormationType, FormationLayout> = {
     { id: 'rcb', label: 'DFC', line: 'DEF', topRatio: 0.75, leftRatio: 0.63 },
     { id: 'lcb', label: 'DFC', line: 'DEF', topRatio: 0.75, leftRatio: 0.37 },
     { id: 'lb', label: 'LI', line: 'DEF', topRatio: 0.75, leftRatio: 0.12 },
-    { id: 'rdm', label: 'MC', line: 'MID', topRatio: 0.58, leftRatio: 0.63 },
-    { id: 'ldm', label: 'MC', line: 'MID', topRatio: 0.58, leftRatio: 0.37 },
-    { id: 'ram', label: 'ED', line: 'MID', topRatio: 0.38, leftRatio: 0.85 },
+    { id: 'rdm', label: 'MC', line: 'MID', topRatio: 0.58, leftRatio: 0.63 }, 
+    { id: 'ldm', label: 'MC', line: 'MID', topRatio: 0.58, leftRatio: 0.37 }, 
+    { id: 'ram', label: 'ED', line: 'MID', topRatio: 0.38, leftRatio: 0.85 }, 
     { id: 'cam', label: 'MCO', line: 'MID', topRatio: 0.38, leftRatio: 0.5 },
-    { id: 'lam', label: 'EI', line: 'MID', topRatio: 0.38, leftRatio: 0.15 },
+    { id: 'lam', label: 'EI', line: 'MID', topRatio: 0.38, leftRatio: 0.15 }, 
     { id: 'st', label: 'DC', line: 'FWD', topRatio: 0.15, leftRatio: 0.5 },
   ],
   "4-3-3": [
@@ -125,9 +125,9 @@ const getSlotBackgroundColor = (line: FormationSlot['line']) => {
   if (line === 'FWD') return 'rgba(255, 180, 180, 0.7)';
   return 'rgba(200, 200, 200, 0.7)';
 };
-const outOfPositionColor = 'rgba(220, 50, 50, 0.7)';
+const outOfPositionColor = 'rgba(220, 50, 50, 0.7)'; 
 
-interface EnrichedPlayerInfoForSummary extends PlayerInfo {
+interface EnrichedPlayerInfoForSummary extends PlayerInfo { 
     assignedPositions?: ActualPlayerPositionType[];
 }
 
@@ -153,7 +153,7 @@ const TacticalBoardDisplay: React.FC<TacticalBoardDisplayProps> = ({ lineup, for
     // Para S vs S, el estado es "Naranja" si está completo, no "Neutro" o "Rojo" individual.
     // Esta lógica se maneja a nivel de pantalla para el estado general del partido.
     // Aquí solo calculamos Neutro/Rojo para la visualización individual del tablero si no es S vs S.
-    if (isTierSvsTierSMatch) return null;
+    if (isTierSvsTierSMatch) return null; 
 
     const currentFormationLayout = FORMATION_DEFINITIONS[formationType];
     let hasPlacedPlayers = false;
@@ -192,10 +192,10 @@ const TacticalBoardDisplay: React.FC<TacticalBoardDisplayProps> = ({ lineup, for
         <ThemedText style={[styles.tacticalStatusText, styles.tacticalStatusRed]}>Esquema Táctico: Rojo</ThemedText>
       )}
       {/* No mostramos "Naranja" aquí, se maneja a nivel de pantalla para el estado general del partido S vs S */}
-      <ThemedView
-        style={styles.tacticalSchemeContainer}
-        lightColor="#e0e0e0"
-        darkColor="#1c1c1e"
+      <ThemedView 
+        style={styles.tacticalSchemeContainer} 
+        lightColor="#e0e0e0" 
+        darkColor="#1c1c1e" 
         onLayout={onFieldLayout}
       >
         {fieldDimensions.width === 0 ? (
@@ -214,10 +214,10 @@ const TacticalBoardDisplay: React.FC<TacticalBoardDisplayProps> = ({ lineup, for
               if (playerInSlot) {
                 const formattedName = formatPlayerNameForField(playerInSlot.name);
                 textContent = formattedName || playerInSlot.number?.toString() || slot.label;
-
+                
                 // Para S vs S, no coloreamos por posición incorrecta, solo por línea.
-                if (!isTierSvsTierSMatch &&
-                    (!playerInSlot.assignedPositions || playerInSlot.assignedPositions.length === 0 ||
+                if (!isTierSvsTierSMatch && 
+                    (!playerInSlot.assignedPositions || playerInSlot.assignedPositions.length === 0 || 
                     !playerInSlot.assignedPositions.includes(slot.label as ActualPlayerPositionType))) {
                   currentSlotBackgroundColor = outOfPositionColor;
                 }
@@ -235,9 +235,9 @@ const TacticalBoardDisplay: React.FC<TacticalBoardDisplayProps> = ({ lineup, for
               return (
                 <View key={slot.id} style={[styles.slot, { backgroundColor: currentSlotBackgroundColor }, slotStyle]}>
                   {textContent ? (
-                    <ThemedText
-                      style={playerInSlot ? styles.slotPlayerName : styles.slotLabel}
-                      numberOfLines={playerInSlot ? 2 : 1}
+                    <ThemedText 
+                      style={playerInSlot ? styles.slotPlayerName : styles.slotLabel} 
+                      numberOfLines={playerInSlot ? 2 : 1} 
                       ellipsizeMode="tail"
                     >
                       {textContent}
@@ -255,13 +255,13 @@ const TacticalBoardDisplay: React.FC<TacticalBoardDisplayProps> = ({ lineup, for
 
 export default function TacticalSummaryScreen() {
   const params = useLocalSearchParams<{
-    homeLineup?: string;
-    awayLineup?: string;
+    homeLineup?: string; 
+    awayLineup?: string; 
     homeTeamName?: string;
     awayTeamName?: string;
-    lineup1?: string;
+    lineup1?: string;    
     team1Name?: string;
-    formation: string;
+    formation: string; 
     matchUrl?: string;
     matchIdentifier?: string;
     teamAName?: string;
@@ -278,9 +278,9 @@ export default function TacticalSummaryScreen() {
   const awayLineupData: Record<string, EnrichedPlayerInfoForSummary | null> | null = params.awayLineup ? JSON.parse(params.awayLineup) : null;
   const singleLineupData: Record<string, EnrichedPlayerInfoForSummary | null> | null = params.lineup1 ? JSON.parse(params.lineup1) : null;
 
-  const homeTeamName = params.homeTeamName || params.teamAName || 'Local';
-  const awayTeamName = params.awayTeamName || params.teamBName || 'Visitante';
-  const singleTeamName = params.team1Name || 'Equipo';
+  const homeTeamName = params.homeTeamName || params.teamAName || 'Local'; 
+  const awayTeamName = params.awayTeamName || params.teamBName || 'Visitante'; 
+  const singleTeamName = params.team1Name || 'Equipo'; 
 
   const teamATier = params.teamATier as TeamTierType | undefined;
   const teamBTier = params.teamBTier as TeamTierType | undefined;
@@ -289,10 +289,7 @@ export default function TacticalSummaryScreen() {
   const isTierSred_A = teamATier === "TierSred";
   const isTierS_B = teamBTier === "TierS";
   const isTierS_vs_TierSred_Match = (isTierS_A && isTierSred_B) || (isTierSred_A && isTierS_B);
-  // Determinar si es un enfrentamiento TierS vs TierS
   const isTierS_vs_TierS_Match = isTierS_A && isTierS_B;
-  const [rainEffect, setRainEffect] = useState<'yes' | 'no' | null>(null);
-  const [initialCalculatedStatus, setInitialCalculatedStatus] = useState<'Neutro' | 'Rojo' | 'Naranja' | null>(null);
 
 
   const areAllSlotsFilledForSummary = useCallback((
@@ -335,122 +332,55 @@ export default function TacticalSummaryScreen() {
 
   useEffect(() => {
     const updateMatchTacticalStatus = async () => {
-    if (!params.matchUrl || !formation) return;
+      if (!params.matchUrl || !formation) return;
 
-      let overallTacticalStatus: 'Neutro' | 'Rojo' | 'Naranja' | 'Verde' | null = null;
-      let baseStatusForRainCheck: 'Neutro' | 'Rojo' | 'Naranja' | null = null;
+      let overallTacticalStatus: 'Neutro' | 'Rojo' | 'Naranja' | null = null;
 
       if (isTierS_vs_TierS_Match) {
         const homeComplete = homeLineupData && areAllSlotsFilledForSummary(homeLineupData, formation);
         const awayComplete = awayLineupData && areAllSlotsFilledForSummary(awayLineupData, formation);
-        baseStatusForRainCheck = (homeComplete && awayComplete) ? 'Naranja' : null; // Naranja es el "Neutro" de SvsS
         if (homeComplete && awayComplete) {
           overallTacticalStatus = 'Naranja';
         } else {
-          overallTacticalStatus = null;
+          overallTacticalStatus = null; // No es Naranja si alguno no está completo
         }
       } else if (singleLineupData) { // TierS vs TierSred or Single S/SRed team scenario
         overallTacticalStatus = checkTacticalSoundness(singleLineupData, formation);
-        baseStatusForRainCheck = overallTacticalStatus;
-      } else if (homeLineupData && awayLineupData) { // SRed vs SRed u otro S/SRed vs S/SRed
+      } else if (homeLineupData && awayLineupData) { // SRed vs SRed (u otro S/SRed vs S/SRed que no sea S vs S)
         const homeStatus = checkTacticalSoundness(homeLineupData, formation);
         const awayStatus = checkTacticalSoundness(awayLineupData, formation);
-        // Para SRed vs SRed, el "base" es el peor de los dos, o Neutro si ambos son Neutro
         if (homeStatus === 'Rojo' || awayStatus === 'Rojo') {
             overallTacticalStatus = 'Rojo';
-            baseStatusForRainCheck = 'Rojo';
         } else if (homeStatus === 'Neutro' && awayStatus === 'Neutro') {
             overallTacticalStatus = 'Neutro';
-            baseStatusForRainCheck = 'Neutro';
         }
       }
-      setInitialCalculatedStatus(baseStatusForRainCheck); // Guardar el estado base antes de la lluvia
 
-      // Aplicar efecto de lluvia si el estado base es Neutro
-      if (baseStatusForRainCheck === 'Neutro' && rainEffect) {
-        overallTacticalStatus = rainEffect === 'yes' ? 'Rojo' : 'Verde';
-      }
-
-
-      if (overallTacticalStatus === 'Neutro' || overallTacticalStatus === 'Rojo' || overallTacticalStatus === 'Naranja' || overallTacticalStatus === 'Verde') {
+      if (overallTacticalStatus === 'Neutro' || overallTacticalStatus === 'Rojo' || overallTacticalStatus === 'Naranja') {
         const storedDataJson = await AsyncStorage.getItem(POST_SCUDETTO_DATA_KEY);
         if (storedDataJson) {
           let allMatches: PostScudettoMatchInfo[] = JSON.parse(storedDataJson);
           const decodedMatchUrl = decodeURIComponent(params.matchUrl!);
+          const matchIndex = allMatches.findIndex(m => m.match === decodedMatchUrl);
 
-          const teamsToUpdate: (string | undefined)[] = [];
-          if (overallTacticalStatus === 'Naranja' && isTierS_vs_TierS_Match) {
-            teamsToUpdate.push(homeTeamName, awayTeamName);
-          } else if (isTierS_vs_TierSred_Match) {
-            teamsToUpdate.push(isTierS_A ? homeTeamName : awayTeamName);
-          } else if (singleLineupData) {
-            teamsToUpdate.push(singleTeamName);
-          } else if (homeLineupData && awayLineupData) { // e.g. SRedvsSRed
-             teamsToUpdate.push(homeTeamName, awayTeamName);
-          } else {
-            // Fallback si el contexto no es uno de los anteriores pero se calculó un estado.
-            // Usar teamAName de los parámetros originales como candidato principal.
-            if (params.teamAName) teamsToUpdate.push(params.teamAName);
-            // Si teamAName no está y es un partido con dos equipos, intentar ambos.
-            // Esto es un fallback amplio; idealmente, los casos específicos anteriores cubren todo.
-            else if (homeTeamName && awayTeamName) teamsToUpdate.push(homeTeamName, awayTeamName);
-            else if (homeTeamName) teamsToUpdate.push(homeTeamName);
-            else if (awayTeamName) teamsToUpdate.push(awayTeamName);
-          }
-
-          let updatedInStorage = false;
-          teamsToUpdate.forEach(teamNameToUpdate => {
-            if (!teamNameToUpdate) return;
-            const matchIndex = allMatches.findIndex(m => m.match === decodedMatchUrl && m.Team === teamNameToUpdate);
-            if (matchIndex !== -1) {
-              const currentMatchStatusInStorage = allMatches[matchIndex].Status;
-              const nonOverwritableStatuses: Array<PostScudettoMatchInfo['Status']> = ['Champion', 'Post scudetto', 'Negativo'];
-              if (!nonOverwritableStatuses.includes(currentMatchStatusInStorage) ||
-                  ((['Neutro', 'Rojo', 'Naranja', 'Verde'].includes(currentMatchStatusInStorage ?? '')) && currentMatchStatusInStorage !== overallTacticalStatus)
-              ) {
-                allMatches[matchIndex].Status = overallTacticalStatus;
-                updatedInStorage = true;
-              }
+          if (matchIndex !== -1) {
+            const currentMatchStatus = allMatches[matchIndex].Status;
+            if (currentMatchStatus !== 'Champion' && currentMatchStatus !== 'Post scudetto' && currentMatchStatus !== 'Negativo') {
+              allMatches[matchIndex].Status = overallTacticalStatus;
+              await AsyncStorage.setItem(POST_SCUDETTO_DATA_KEY, JSON.stringify(allMatches));
             }
-          });
-
-          if (updatedInStorage) {
-            await AsyncStorage.setItem(POST_SCUDETTO_DATA_KEY, JSON.stringify(allMatches));
           }
         }
-      } else { // overallTacticalStatus es null (ej. alineación incompleta)
+      } else { 
         const storedDataJson = await AsyncStorage.getItem(POST_SCUDETTO_DATA_KEY);
         if (storedDataJson) {
           let allMatches: PostScudettoMatchInfo[] = JSON.parse(storedDataJson);
           const decodedMatchUrl = decodeURIComponent(params.matchUrl!);
-
-          const teamsToClear: (string | undefined)[] = [];
-            if (isTierS_vs_TierS_Match) {
-                teamsToClear.push(homeTeamName, awayTeamName);
-            } else if (isTierS_vs_TierSred_Match) {
-                teamsToClear.push(isTierS_A ? homeTeamName : awayTeamName);
-            } else if (singleLineupData) {
-                teamsToClear.push(singleTeamName);
-            } else if (homeLineupData && awayLineupData) {
-                teamsToClear.push(homeTeamName, awayTeamName);
-            } else {
-                if(params.teamAName) teamsToClear.push(params.teamAName);
-                else if (homeTeamName) teamsToClear.push(homeTeamName);
-            }
-
-            let updatedInStorage = false;
-            teamsToClear.forEach(teamNameToClear => {
-                if(!teamNameToClear) return;
-                const matchIndex = allMatches.findIndex(m => m.match === decodedMatchUrl && m.Team === teamNameToClear);
-                if (matchIndex !== -1) {
-                    const currentStatusInStorage = allMatches[matchIndex]?.Status;
-                    if (currentStatusInStorage === "Neutro" || currentStatusInStorage === "Rojo" || currentStatusInStorage === "Naranja" || currentStatusInStorage === "Verde") {
-                        allMatches[matchIndex].Status = null;
-                        updatedInStorage = true;
-                    }
-                }
-            });
-            if(updatedInStorage) {
+          const matchIndex = allMatches.findIndex(m => m.match === decodedMatchUrl);
+          if (matchIndex !== -1) {
+            const currentStatusInStorage = allMatches[matchIndex]?.Status;
+            if (currentStatusInStorage === "Neutro" || currentStatusInStorage === "Rojo" || currentStatusInStorage === "Naranja") {
+                allMatches[matchIndex].Status = null; 
                 await AsyncStorage.setItem(POST_SCUDETTO_DATA_KEY, JSON.stringify(allMatches));
             }
           }
@@ -459,20 +389,20 @@ export default function TacticalSummaryScreen() {
     };
 
     updateMatchTacticalStatus();
-  }, [params.matchUrl, formation, singleLineupData, homeLineupData, awayLineupData, checkTacticalSoundness, areAllSlotsFilledForSummary, isTierS_vs_TierS_Match, rainEffect, homeTeamName, awayTeamName, singleTeamName, params.teamAName, isTierS_A, isTierS_vs_TierSred_Match, isTierS_B]);
+  }, [params.matchUrl, formation, singleLineupData, homeLineupData, awayLineupData, checkTacticalSoundness, areAllSlotsFilledForSummary, isTierS_vs_TierS_Match]);
 
   const handleEditLineup = () => {
-    if (params.matchUrl) {
+    if (params.matchUrl) { 
         router.push({
             pathname: `/match-analysis`,
-            params: {
+            params: { 
                 matchUrl: params.matchUrl,
                 matchIdentifier: params.matchIdentifier,
                 teamAName: params.teamAName,
                 teamATier: params.teamATier,
                 teamBName: params.teamBName,
                 teamBTier: params.teamBTier,
-                isEditing: 'true'
+                isEditing: 'true' 
             }
         });
     } else {
@@ -487,7 +417,7 @@ export default function TacticalSummaryScreen() {
       </ThemedView>
     );
   }
-
+  
   const overallStatusForTierSvsTierS = useMemo(() => {
     if (isTierS_vs_TierS_Match) {
         const homeComplete = homeLineupData && areAllSlotsFilledForSummary(homeLineupData, formation);
@@ -505,47 +435,27 @@ export default function TacticalSummaryScreen() {
           <Stack.Screen options={{ title: `Resumen: ${homeTeamName} vs ${awayTeamName}` }} />
           {overallStatusForTierSvsTierS === "Naranja" && (
             <ThemedText style={[styles.tacticalStatusText, styles.tacticalStatusOrange]}>
-                Estado Táctico: Naranja (Ambos TierS Completos)
+                Estado General del Partido: Naranja (Ambos TierS Completos)
             </ThemedText>
           )}
-          {/* Lluvia no aplica a Naranja directamente, se maneja si el base fuera Neutro */}
           <TacticalBoardDisplay lineup={homeLineupData} formationType={formation} teamName={homeTeamName} isTierSvsTierSMatch={true} />
           <TacticalBoardDisplay lineup={awayLineupData} formationType={formation} teamName={awayTeamName} isTierSvsTierSMatch={true} />
         </>
-      ) : (singleLineupData || (homeLineupData && awayLineupData && !isTierS_vs_TierS_Match)) ? ( // Cubre SvsSred, SRedvsSRed, y Single S/SRed
+      ) :isTierS_vs_TierSred_Match && singleLineupData ? (
         <>
-          <Stack.Screen options={{ title: `Resumen: ${singleTeamName || (homeTeamName && awayTeamName ? `${homeTeamName} vs ${awayTeamName}` : 'Táctico')}` }} />
-          {initialCalculatedStatus === 'Neutro' && (
-            <View style={styles.rainSelectorContainer}>
-              <ThemedText style={styles.rainLabel}>Lluvia:</ThemedText>
-              <TouchableOpacity
-                style={[styles.rainButton, rainEffect === 'yes' && styles.rainButtonSelectedYes]}
-                onPress={() => setRainEffect('yes')}>
-                <ThemedText style={[styles.rainButtonText, rainEffect === 'yes' && styles.rainButtonTextSelected]}>Sí</ThemedText>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.rainButton, rainEffect === 'no' && styles.rainButtonSelectedNo]}
-                onPress={() => setRainEffect('no')}>
-                <ThemedText style={[styles.rainButtonText, rainEffect === 'no' && styles.rainButtonTextSelected]}>No</ThemedText>
-              </TouchableOpacity>
-            </View>
-          )}
-          {rainEffect === 'no' && initialCalculatedStatus === 'Neutro' && (
-            <ThemedText style={[styles.tacticalStatusText, styles.tacticalStatusGreen]}>
-                Estado Táctico: Verde (Neutro + Sin Lluvia)
-            </ThemedText>
-          )}
-          {isTierS_vs_TierSred_Match && singleLineupData ? (
-            <TacticalBoardDisplay lineup={singleLineupData} formationType={formation} teamName={singleTeamName} />
-          ) : homeLineupData && awayLineupData ? ( // SRed vs SRed u otro S/SRed vs S/SRed
-            <>
-            <TacticalBoardDisplay lineup={homeLineupData} formationType={formation} teamName={homeTeamName} />
-            <TacticalBoardDisplay lineup={awayLineupData} formationType={formation} teamName={awayTeamName} />
-            </>
-          ) : singleLineupData ? ( // Single S/SRed vs non-S/SRed
-            <TacticalBoardDisplay lineup={singleLineupData} formationType={formation} teamName={singleTeamName} />
-          ) : null
-          }
+          <Stack.Screen options={{ title: `Resumen: ${singleTeamName} (TierS)` }} />
+          <TacticalBoardDisplay lineup={singleLineupData} formationType={formation} teamName={singleTeamName} />
+        </>
+      ) : homeLineupData && awayLineupData ? ( // SRed vs SRed u otro S/SRed vs S/SRed
+        <>
+          <Stack.Screen options={{ title: 'Resumen Táctico (Doble)' }} />
+          <TacticalBoardDisplay lineup={homeLineupData} formationType={formation} teamName={homeTeamName} />
+          <TacticalBoardDisplay lineup={awayLineupData} formationType={formation} teamName={awayTeamName} />
+        </>
+      ) : singleLineupData ? ( // Single S/SRed vs non-S/SRed (fallback)
+         <>
+          <Stack.Screen options={{ title: `Resumen: ${singleTeamName}` }} />
+          <TacticalBoardDisplay lineup={singleLineupData} formationType={formation} teamName={singleTeamName} />
         </>
       ) : (
         <ThemedView style={styles.container}>
@@ -563,11 +473,11 @@ export default function TacticalSummaryScreen() {
 
 const styles = StyleSheet.create({
   scrollContainer: {
-    flexGrow: 1,
+    flexGrow: 1, 
     alignItems: 'center',
     paddingVertical: 20,
   },
-  container: {
+  container: { 
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
@@ -584,23 +494,19 @@ const styles = StyleSheet.create({
   },
   tacticalStatusText: {
     fontSize: 14,
-    color: Colors.light.tint,
+    color: Colors.light.tint, 
     marginBottom: 8,
     textAlign: 'center',
   },
   tacticalStatusRed: {
-    color: 'red',
+    color: 'red', 
   },
   tacticalStatusOrange: { // Nuevo estilo para Naranja
     color: 'orange',
     fontWeight: 'bold',
   },
-  tacticalStatusGreen: { // Nuevo estilo para Verde
-    color: 'green',
-    fontWeight: 'bold',
-  },
   tacticalSchemeContainer: {
-    width: '90%',
+    width: '90%', 
     aspectRatio: 0.75,
     justifyContent: 'center',
     alignItems: 'center',
@@ -616,14 +522,14 @@ const styles = StyleSheet.create({
   },
   fieldBorder: {
     position: 'absolute',
-    backgroundColor: 'rgba(120, 120, 120, 0.4)',
+    backgroundColor: 'rgba(120, 120, 120, 0.4)', 
   },
   fieldBorderTop: { top: '2%', left: '2%', right: '2%', height: 2, },
   fieldBorderBottom: { bottom: '2%', left: '2%', right: '2%', height: 2, },
   fieldBorderLeft: { top: '2%', bottom: '2%', left: '2%', width: 2, },
   fieldBorderRight: { top: '2%', bottom: '2%', right: '2%', width: 2, },
   slot: {
-    width: 60,
+    width: 60, 
     height: 45,
     borderWidth: 1,
     borderColor: '#fff',
@@ -635,40 +541,7 @@ const styles = StyleSheet.create({
   slotLabel: { fontSize: 9, fontWeight: 'bold', color: '#fff', },
   slotPlayerName: { fontSize: 8, color: '#fff', textAlign: 'center', fontWeight: '600' },
   editButtonContainer: {
-    marginTop: 10,
-    width: '80%',
-    marginBottom: 20,
-  },
-  rainSelectorContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginVertical: 15,
-  },
-  rainLabel: {
-    fontSize: 16,
-    marginRight: 10,
-  },
-  rainButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 20,
-    borderRadius: 5,
-    borderWidth: 1,
-    borderColor: Colors.light.tint, // Default border color
-    marginHorizontal: 5,
-  },
-  rainButtonSelectedYes: {
-    backgroundColor: 'red', // Rojo para "Sí"
-    borderColor: 'darkred',
-  },
-  rainButtonSelectedNo: {
-    backgroundColor: 'green', // Verde para "No"
-    borderColor: 'darkgreen',
-  },
-  rainButtonText: {
-    fontSize: 16,
-  },
-  rainButtonTextSelected: {
-    color: '#fff', // Texto blanco para botones seleccionados
-  },
+    marginTop: 10, 
+    width: '80%', 
+  }
 });
