@@ -423,4 +423,5 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     color: Colors.light.icon,
   },
+  
 });
