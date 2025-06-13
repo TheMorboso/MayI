@@ -1,6 +1,6 @@
 // c/Users/Mauri/Desktop/CCC23/MayI/CCC23/app/team-matches/[teamId].tsx
 import React, { useEffect, useState } from 'react';
-import { FlatList, ActivityIndicator, StyleSheet, View, Image, TouchableOpacity, Alert, Modal, Button, Platform, Text } from 'react-native';
+import { FlatList, ActivityIndicator, StyleSheet, View, Image, TouchableOpacity, Alert, Modal, Button, Platform, ScrollView } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import { useLocalSearchParams, Stack, useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -21,14 +21,13 @@ const COACH_TACTICAL_SCHEMES = ["4-2-3-1", "4-4-2", "3-4-2-1", "4-3-3", "3-5-2",
 type CoachTacticalSchemeType = typeof COACH_TACTICAL_SCHEMES[number];
 const DEFAULT_SCHEME_PLACEHOLDER: CoachTacticalSchemeType = "No Definido";
 
-const PLAYER_POSITIONS = [
-  "POR", "DFC", "LD", "LI", "CAD", "CAI", "MCD", "MC", "MCO", "MD", "MI", "ED", "EI", "DC", "SD", "No Definida"
+const ACTUAL_PLAYER_POSITIONS = [ // CAD, CAI, MCD eliminadas
+  "POR", "DFC", "LD", "LI", "MC", "MCO", "MD", "MI", "ED", "EI", "DC", "SD", "PIV"
 ] as const;
-type PlayerPositionType = typeof PLAYER_POSITIONS[number];
-const DEFAULT_PLAYER_POSITION_PLACEHOLDER: PlayerPositionType = "No Definida";
+type ActualPlayerPositionType = typeof ACTUAL_PLAYER_POSITIONS[number];
 
 interface SquadPlayerDisplayInfo extends PlayerInfo { // PlayerInfo de api/analisis solo tiene name y number
-    assignedPosition?: PlayerPositionType | null;
+    assignedPositions?: ActualPlayerPositionType[] | null; // Changed from assignedPosition to assignedPositions (array)
 }
 interface SquadInfo {
   teamLogo: string | null;
@@ -38,12 +37,13 @@ interface SquadInfo {
   players: SquadPlayerDisplayInfo[];
 }
 
+// Cache entry for players, potentially including their multiple positions
 interface PlayerCacheEntry {
     name: string | null;
     isManager?: boolean;
     equipo?: string | null;
     tacticalScheme?: CoachTacticalSchemeType | null;
-    position?: PlayerPositionType | null; // Nueva propiedad para la posición del jugador
+    positions?: ActualPlayerPositionType[] | null; // Changed from position to positions (array)
 }
 
 export default function TeamMatchesScreen() {
@@ -64,6 +64,11 @@ export default function TeamMatchesScreen() {
   const [isLoadingSquad, setIsLoadingSquad] = useState(false);
   const [selectedCoachScheme, setSelectedCoachScheme] = useState<CoachTacticalSchemeType>(DEFAULT_SCHEME_PLACEHOLDER);
   const colorScheme = useColorScheme();
+
+  // State for the new player position editing modal
+  const [isPlayerPositionModalVisible, setIsPlayerPositionModalVisible] = useState(false);
+  const [playerForPositionEditing, setPlayerForPositionEditing] = useState<SquadPlayerDisplayInfo | null>(null);
+  const [tempSelectedPositions, setTempSelectedPositions] = useState<ActualPlayerPositionType[]>([]);
 
   useEffect(() => {
     const loadMatches = async () => {
@@ -186,7 +191,7 @@ export default function TeamMatchesScreen() {
             teamPlayers.push({ 
               name: person.name, 
               number: undefined, // El caché global no guarda el número del jugador, solo el nombre
-              assignedPosition: person.position || null 
+              assignedPositions: person.positions || [] // Ensure it's an array
             });
           }
         }
@@ -236,12 +241,10 @@ export default function TeamMatchesScreen() {
     }
   };
 
-  const handleSavePlayerPosition = async (playerName: string, newPosition: PlayerPositionType) => {
+  const handleSavePlayerPositions = async (playerName: string, newPositions: ActualPlayerPositionType[]) => {
     if (!squadData || !squadData.teamName || !playerName) {
       Alert.alert("Error", "Info de jugador/equipo incompleta."); return;
     }
-
-    const positionToSave = newPosition === DEFAULT_PLAYER_POSITION_PLACEHOLDER ? null : newPosition;
 
     // Optimistic UI update
     setSquadData(prevSquadData => {
@@ -249,7 +252,7 @@ export default function TeamMatchesScreen() {
         return {
             ...prevSquadData,
             players: prevSquadData.players.map(p =>
-                p.name === playerName ? { ...p, assignedPosition: positionToSave } : p
+                p.name === playerName ? { ...p, assignedPositions: newPositions } : p
             )
         };
     });
@@ -267,10 +270,10 @@ export default function TeamMatchesScreen() {
       }
 
       if (playerKeyToUpdate) {
-        globalPlayerData[playerKeyToUpdate].position = positionToSave;
+        globalPlayerData[playerKeyToUpdate].positions = newPositions; // Save the array
         await AsyncStorage.setItem(PLAYERS_GLOBAL_CACHE_KEY, JSON.stringify(globalPlayerData));
         // Alert.alert("Éxito", `Posición '${newPosition}' guardada para ${playerName}.`); // Puede ser muy verboso
-        console.log(`Posición '${newPosition}' guardada para ${playerName}.`);
+        console.log(`Posiciones '${newPositions.join(', ')}' guardadas para ${playerName}.`);
       } else {
         Alert.alert("Error", `Jugador ${playerName} no encontrado en caché para el equipo ${squadData.teamName}.`);
       }
@@ -278,6 +281,17 @@ export default function TeamMatchesScreen() {
       Alert.alert("Error al Guardar Posición", `No se pudo guardar: ${error.message}`);
       // Revertir UI si falla el guardado (opcional, o recargar datos)
     }
+  };
+
+  const openPlayerPositionModal = (player: SquadPlayerDisplayInfo) => {
+    setPlayerForPositionEditing(player);
+    setTempSelectedPositions(player.assignedPositions || []);
+    setIsPlayerPositionModalVisible(true);
+  };
+
+  const onSavePlayerPositionsFromModal = () => {
+    if (playerForPositionEditing?.name) handleSavePlayerPositions(playerForPositionEditing.name, tempSelectedPositions);
+    setIsPlayerPositionModalVisible(false);
   };
 
 
@@ -380,29 +394,21 @@ export default function TeamMatchesScreen() {
   };
 
   const renderSquadPlayerItem = ({ item }: { item: SquadPlayerDisplayInfo }) => {
+    const displayPositions = (item.assignedPositions && item.assignedPositions.length > 0)
+      ? item.assignedPositions.join(', ')
+      : "No Definida";
+
     return (
-      <ThemedView style={styles.squadPlayerItemRow} lightColor="#f0f0f0" darkColor="#3a3a3a">
-        <ThemedText style={styles.squadPlayerNameText} numberOfLines={1} ellipsizeMode="tail">
-          {item.name || 'Nombre Desconocido'}
-        </ThemedText>
-        <View style={styles.squadPlayerPickerContainer}>
-          <Picker
-            selectedValue={item.assignedPosition || DEFAULT_PLAYER_POSITION_PLACEHOLDER}
-            style={[styles.squadPlayerPicker, { color: Colors[colorScheme ?? 'light'].text }]}
-            dropdownIconColor={Colors[colorScheme ?? 'light'].icon}
-            onValueChange={(itemValue) => {
-              if (item.name) { // Asegurarse que el nombre del jugador existe
-                handleSavePlayerPosition(item.name, itemValue as PlayerPositionType);
-              }
-            }}
-            mode="dropdown" // 'dialog' en Android, 'dropdown' en iOS
-          >
-            {PLAYER_POSITIONS.map((pos) => (
-              <Picker.Item key={pos} label={pos} value={pos} style={{fontSize: 12}} />
-            ))}
-          </Picker>
-        </View>
-      </ThemedView>
+      <TouchableOpacity onPress={() => openPlayerPositionModal(item)}>
+        <ThemedView style={styles.squadPlayerItemRow} lightColor="#f0f0f0" darkColor="#3a3a3a">
+          <ThemedText style={styles.squadPlayerNameText} numberOfLines={1} ellipsizeMode="tail">
+            {item.name || 'Nombre Desconocido'}
+          </ThemedText>
+          <ThemedText style={styles.squadPlayerPositionText} numberOfLines={2} ellipsizeMode="tail">
+            {displayPositions}
+          </ThemedText>
+        </ThemedView>
+      </TouchableOpacity>
     );
   };
 
@@ -509,6 +515,52 @@ export default function TeamMatchesScreen() {
                  <ThemedText>No hay datos del squad para mostrar o no se encontraron en el caché.</ThemedText>
               )}
                <Button title="Cerrar" onPress={() => setIsSquadModalVisible(false)} color={Platform.OS === 'ios' ? Colors.light.tint : undefined} />
+            </ThemedView>
+          </View>
+        </Modal>
+      )}
+
+      {isPlayerPositionModalVisible && playerForPositionEditing && (
+        <Modal
+          animationType="fade"
+          transparent={true}
+          visible={isPlayerPositionModalVisible}
+          onRequestClose={() => setIsPlayerPositionModalVisible(false)}
+        >
+          <View style={styles.centeredModalView}>
+            <ThemedView style={[styles.modalView, styles.playerPositionModalView]} lightColor={Colors.light.background} darkColor={Colors.dark.background}>
+              <ThemedText type="subtitle" style={{ marginBottom: 5 }}>Editar Posiciones para:</ThemedText>
+              <ThemedText style={{ fontWeight: 'bold', fontSize: 16, marginBottom: 15 }}>{playerForPositionEditing.name}</ThemedText>
+              <ScrollView style={styles.positionsScrollView}>
+                <View style={styles.positionsContainer}>
+                  {ACTUAL_PLAYER_POSITIONS.map(pos => {
+                    const isSelected = tempSelectedPositions.includes(pos);
+                    return (
+                      <TouchableOpacity
+                        key={pos}
+                        style={[
+                          styles.positionChip,
+                          { borderColor: Colors[colorScheme ?? 'light'].icon },
+                          isSelected && { backgroundColor: Colors[colorScheme ?? 'light'].tint }
+                        ]}
+                        onPress={() => {
+                          if (isSelected) {
+                            setTempSelectedPositions(tempSelectedPositions.filter(p => p !== pos));
+                          } else {
+                            setTempSelectedPositions([...tempSelectedPositions, pos]);
+                          }
+                        }}
+                      >
+                        <ThemedText style={[styles.positionChipText, isSelected && { color: '#fff' }]}>{pos}</ThemedText>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </ScrollView>
+              <View style={styles.modalButtonContainer}>
+                <Button title="Cancelar" onPress={() => setIsPlayerPositionModalVisible(false)} color={Platform.OS === 'ios' ? (colorScheme === 'dark' ? Colors.dark.tint : '#FF3B30') : '#FF3B30'} />
+                <Button title="Guardar" onPress={onSavePlayerPositionsFromModal} color={Colors.light.tint} />
+              </View>
             </ThemedView>
           </View>
         </Modal>
@@ -723,25 +775,22 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 4, // Reducido para más items
+    paddingVertical: 8, // Ajustado para mejor espaciado
     paddingHorizontal: 8,
     borderRadius: 6,
-    marginVertical: 2, // Reducido
+    marginVertical: 3, // Ajustado
   },
   squadPlayerNameText: { // Estilo para el nombre del jugador
     fontSize: 15,
     flex: 1, // Para que el nombre tome el espacio disponible
     marginRight: 8, // Espacio antes del picker
+    fontWeight: '600',
   },
-  squadPlayerPickerContainer: { // Contenedor del Picker para controlar su tamaño
-    width: Platform.OS === 'ios' ? 130 : 150, // Ancho fijo para el picker
-    height: Platform.OS === 'ios' ? 80 : 50, // Altura para el picker
-    justifyContent: 'center',
-  },
-  squadPlayerPicker: { // Estilo del Picker en sí
-    width: '100%',
-    height: Platform.OS === 'ios' ? 'auto' : 50, // 'auto' para iOS puede funcionar mejor con la altura del contenedor
-    transform: Platform.OS === 'ios' ? [{ scaleX: 0.8 }, { scaleY: 0.8 }] : [], // Reducir tamaño en iOS
+  squadPlayerPositionText: { // Estilo para el texto de las posiciones del jugador
+    fontSize: 13,
+    opacity: 0.8,
+    textAlign: 'right',
+    flexShrink: 1, // Allow shrinking if positions list is long
   },
   pickerContainer: { // Para el picker del coach
     width: '90%',
@@ -757,4 +806,35 @@ const styles = StyleSheet.create({
     width: '100%',
     height: Platform.OS === 'ios' ? 120 : 50,
   },
+  // Styles for Player Position Editing Modal
+  playerPositionModalView: { // Specific styles for this modal if needed, inherits modalView
+    maxHeight: '70%', // Adjust as needed
+  },
+  positionsScrollView: {
+    width: '100%',
+    maxHeight: 250, // Max height for the scrollable area of positions
+    marginBottom: 15,
+  },
+  positionsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    paddingVertical: 5,
+  },
+  positionChip: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 15,
+    borderWidth: 1,
+    margin: 4,
+  },
+  positionChipText: {
+    fontSize: 14,
+  },
+  modalButtonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    width: '100%',
+    marginTop: 10,
+  }
 });
