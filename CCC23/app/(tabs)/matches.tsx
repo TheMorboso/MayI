@@ -338,7 +338,13 @@ export default function MatchesScreen() {
     // (que queremos renderizar normalmente, y la lógica de deduplicación ya manejó que solo aparezca una vez).
     return (
       <TouchableOpacity onPress={() => handlePressMatchItem(item)} activeOpacity={item.match ? 0.7 : 1}>
-        <ThemedView style={styles.dailyMatchItemContainer} lightColor="#f9f9f9" darkColor="#2C2C2E">
+        <ThemedView 
+          style={[
+            styles.dailyMatchItemContainer,
+            item.Status === "Neutro" && styles.neutralBorder,
+            item.Status === "Rojo" && styles.redBorder // Aplicar borde si el Status es "Rojo"
+          ]} 
+          lightColor="#f9f9f9" darkColor="#2C2C2E">
           <View style={styles.matchHeaderRow}>
               <View style={styles.matchHeaderTeamInfo}>
                 {shouldShowTeamEmblemInHeader && item.teamEmblemSrc && (
@@ -638,6 +644,14 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     textAlign: 'center',
+  },
+  neutralBorder: { // Estilo para el borde blanco de Status "Neutro"
+    borderColor: 'white',
+    borderWidth: 1,
+  },
+  redBorder: { // Estilo para el borde rojo de Status "Rojo"
+    borderColor: 'red',
+    borderWidth: 1,
   },
   // Estilos para la sección de info general y modal (mayormente sin cambios)
   content: {

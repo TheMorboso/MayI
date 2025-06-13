@@ -360,7 +360,13 @@ export default function TeamMatchesScreen() {
               )}
             </View>
           )}
-          <ThemedView style={styles.matchItem} lightColor="#f9f9f9" darkColor="#2C2C2E">
+          <ThemedView 
+            style={[
+              styles.matchItem,
+              item.Status === "Neutro" && styles.neutralBorder,
+              item.Status === "Rojo" && styles.redBorder // Aplicar borde si el Status es "Rojo"
+            ]} 
+            lightColor="#f9f9f9" darkColor="#2C2C2E">
             <View style={styles.matchContentRow}>
               <View style={styles.leftAndMiddleContainer}>
                 <View style={styles.dateTimeContainer}>
@@ -698,6 +704,14 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     textAlign: 'center',
+  },
+  neutralBorder: { // Estilo para el borde blanco de Status "Neutro"
+    borderColor: 'white',
+    borderWidth: 1,
+  },
+  redBorder: { // Estilo para el borde rojo de Status "Rojo"
+    borderColor: 'red',
+    borderWidth: 1,
   },
   teamEmblemStyle: {
     width: 20, 

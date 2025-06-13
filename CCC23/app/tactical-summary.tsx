@@ -1,12 +1,14 @@
 // cabs/Users/Mauri/Desktop/CCC23/MayI/CCC23/app/tactical-summary.tsx
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { StyleSheet, View, ScrollView, ActivityIndicator, Button, Platform } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { ThemedView } from '@/components/ThemedView';
 import { ThemedText } from '@/components/ThemedText';
 import { PlayerInfo } from '@/api/analisis'; 
 import { Colors } from '@/constants/Colors';
+import { PostScudettoMatchInfo } from '@/api/postscudetto'; // Para tipar los datos de AsyncStorage
 
 // --- COPIADO DE match-analysis.tsx (o idealmente, refactorizado a un archivo compartido) ---
 interface FormationSlot {
@@ -144,6 +146,32 @@ const TacticalBoardDisplay: React.FC<TacticalBoardDisplayProps> = ({ lineup, for
     setFieldDimensions({ width, height });
   }, []);
 
+  const tacticalStatus = useMemo((): 'Neutro' | 'Rojo' | null => {
+    if (!formationType || !FORMATION_DEFINITIONS[formationType] || Object.keys(lineup).length === 0) {
+      return null;
+    }
+    const currentFormationLayout = FORMATION_DEFINITIONS[formationType];
+    let hasPlacedPlayers = false;
+    let hasMisplacedPlayer = false;
+
+    for (const slot of currentFormationLayout) {
+      const playerInSlot = lineup[slot.id];
+      if (playerInSlot) {
+        hasPlacedPlayers = true;
+        if (!playerInSlot.assignedPositions || playerInSlot.assignedPositions.length === 0) {
+          hasMisplacedPlayer = true;
+        } else {
+          const isPlayerInCorrectPosition = playerInSlot.assignedPositions.includes(slot.label as ActualPlayerPositionType);
+          if (!isPlayerInCorrectPosition) {
+            hasMisplacedPlayer = true;
+          }
+        }
+      }
+    }
+    if (!hasPlacedPlayers) return null;
+    return hasMisplacedPlayer ? 'Rojo' : 'Neutro';
+  }, [lineup, formationType]);
+
   if (!FORMATION_DEFINITIONS[formationType]) {
     return <ThemedText>Formación desconocida: {formationType}</ThemedText>;
   }
@@ -152,6 +180,12 @@ const TacticalBoardDisplay: React.FC<TacticalBoardDisplayProps> = ({ lineup, for
   return (
     <View style={styles.boardOuterContainer}>
       <ThemedText type="subtitle" style={styles.teamNameHeader}>{teamName}</ThemedText>
+      {tacticalStatus === 'Neutro' && (
+        <ThemedText style={styles.tacticalStatusText}>Esquema Táctico: Neutro</ThemedText>
+      )}
+      {tacticalStatus === 'Rojo' && (
+        <ThemedText style={[styles.tacticalStatusText, styles.tacticalStatusRed]}>Esquema Táctico: Rojo</ThemedText>
+      )}
       <ThemedView 
         style={styles.tacticalSchemeContainer} 
         lightColor="#e0e0e0" 
@@ -246,6 +280,8 @@ export default function TacticalSummaryScreen() {
     teamBTier?: string;
   }>();
   const router = useRouter();
+  const POST_SCUDETTO_DATA_KEY = 'postScudettoAllMatchData';
+
 
   const formation = params.formation as FormationType | undefined;
 
@@ -257,6 +293,117 @@ export default function TacticalSummaryScreen() {
   const homeTeamName = params.homeTeamName || 'Local'; // Usado si homeLineupData existe
   const awayTeamName = params.awayTeamName || 'Visitante'; // Usado si awayLineupData existe
   const singleTeamName = params.team1Name || 'Equipo'; // Usado si singleLineupData existe
+
+  const checkTacticalSoundness = useCallback((
+    lineupToCheck: Record<string, EnrichedPlayerInfoForSummary | null> | null,
+    formationToCheck: FormationType | undefined
+  ): 'Neutro' | 'Rojo' | null => {
+    if (!formationToCheck || !lineupToCheck || Object.keys(lineupToCheck).length === 0 || !FORMATION_DEFINITIONS[formationToCheck]) {
+      return null;
+    }
+    const currentFormationLayout = FORMATION_DEFINITIONS[formationToCheck];
+    let hasPlacedPlayers = false;
+    let hasMisplacedPlayer = false;
+
+    for (const slot of currentFormationLayout) {
+      const playerInSlot = lineupToCheck[slot.id];
+      if (playerInSlot) {
+        hasPlacedPlayers = true;
+        if (!playerInSlot.assignedPositions || playerInSlot.assignedPositions.length === 0) {
+          hasMisplacedPlayer = true;
+        } else {
+          const isPlayerInCorrectPosition = playerInSlot.assignedPositions.includes(slot.label as ActualPlayerPositionType);
+          if (!isPlayerInCorrectPosition) {
+            hasMisplacedPlayer = true;
+          }
+        }
+      }
+    }
+    if (!hasPlacedPlayers) return null;
+    return hasMisplacedPlayer ? 'Rojo' : 'Neutro';
+  }, []);
+
+  useEffect(() => {
+    const updateMatchTacticalStatus = async () => {
+      if (!params.matchUrl || !formation) return;
+
+      let overallTacticalStatus: 'Neutro' | 'Rojo' | null = null;
+
+      // Determine actual tiers for home and away based on passed params
+      let homeActualTierParam: string | null | undefined = null; 
+      let awayActualTierParam: string | null | undefined = null;
+
+      if (params.homeTeamName) {
+          if (params.homeTeamName === params.teamAName) {
+            homeActualTierParam = params.teamATier;
+            if (params.awayTeamName === params.teamBName) awayActualTierParam = params.teamBTier;
+          } else if (params.homeTeamName === params.teamBName) {
+            homeActualTierParam = params.teamBTier;
+            if (params.awayTeamName === params.teamAName) awayActualTierParam = params.teamATier;
+          }
+      }
+
+
+      if (singleLineupData) {
+        overallTacticalStatus = checkTacticalSoundness(singleLineupData, formation);
+      } else if (homeLineupData && awayLineupData) {
+        // Lógica específica para TierS vs TierSred
+        if (homeActualTierParam === "TierS" && awayActualTierParam === "TierSred") {
+            overallTacticalStatus = checkTacticalSoundness(homeLineupData, formation);
+        } else if (homeActualTierParam === "TierSred" && awayActualTierParam === "TierS") {
+            overallTacticalStatus = checkTacticalSoundness(awayLineupData, formation);
+        } else {
+            // Lógica original para otros pares (ej. S vs S, SRed vs SRed, o si los tiers no son S/SRed)
+            const homeStatus = checkTacticalSoundness(homeLineupData, formation);
+            const awayStatus = checkTacticalSoundness(awayLineupData, formation);
+            if (homeStatus === 'Rojo' || awayStatus === 'Rojo') {
+                overallTacticalStatus = 'Rojo';
+            } else if (homeStatus === 'Neutro' && awayStatus === 'Neutro') {
+                overallTacticalStatus = 'Neutro';
+            }
+        }
+      } else if (homeLineupData) { // Solo home (ej. TierS vs no-TierS)
+        overallTacticalStatus = checkTacticalSoundness(homeLineupData, formation);
+      } else if (awayLineupData) { // Solo away
+        overallTacticalStatus = checkTacticalSoundness(awayLineupData, formation);
+      }
+
+      if (overallTacticalStatus === 'Neutro' || overallTacticalStatus === 'Rojo') {
+        const storedDataJson = await AsyncStorage.getItem(POST_SCUDETTO_DATA_KEY);
+        if (storedDataJson) {
+          let allMatches: PostScudettoMatchInfo[] = JSON.parse(storedDataJson);
+          const decodedMatchUrl = decodeURIComponent(params.matchUrl!);
+          const matchIndex = allMatches.findIndex(m => m.match === decodedMatchUrl);
+
+          if (matchIndex !== -1) {
+            const currentMatchStatus = allMatches[matchIndex].Status;
+            // Solo modificar si no es un estado prioritario
+            if (currentMatchStatus !== 'Champion' && currentMatchStatus !== 'Post scudetto' && currentMatchStatus !== 'Negativo') {
+              allMatches[matchIndex].Status = overallTacticalStatus;
+              await AsyncStorage.setItem(POST_SCUDETTO_DATA_KEY, JSON.stringify(allMatches));
+              console.log(`[TacticalSummary] Match ${decodedMatchUrl} Status updated to ${overallTacticalStatus}.`);
+            }
+          }
+        }
+      } else { // overallTacticalStatus es null
+        const storedDataJson = await AsyncStorage.getItem(POST_SCUDETTO_DATA_KEY);
+        if (storedDataJson) {
+          let allMatches: PostScudettoMatchInfo[] = JSON.parse(storedDataJson);
+          const decodedMatchUrl = decodeURIComponent(params.matchUrl!);
+          const matchIndex = allMatches.findIndex(m => m.match === decodedMatchUrl);
+          const currentStatusInStorage = allMatches[matchIndex]?.Status;
+
+          if (matchIndex !== -1 && (currentStatusInStorage === "Neutro" || currentStatusInStorage === "Rojo")) {
+            allMatches[matchIndex].Status = null; // O undefined, o ''
+            await AsyncStorage.setItem(POST_SCUDETTO_DATA_KEY, JSON.stringify(allMatches));
+            console.log(`[TacticalSummary] Match ${decodedMatchUrl} Status reverted from ${currentStatusInStorage}.`);
+          }
+        }
+      }
+    };
+
+    updateMatchTacticalStatus();
+  }, [params.matchUrl, formation, singleLineupData, homeLineupData, awayLineupData, checkTacticalSoundness, params.teamAName, params.teamATier, params.teamBName, params.teamBTier, params.homeTeamName, params.awayTeamName]);
 
   const handleEditLineup = () => {
     if (params.matchUrl) { 
@@ -333,6 +480,14 @@ const styles = StyleSheet.create({
   teamNameHeader: {
     marginBottom: 10,
     fontSize: 18,
+  },
+  tacticalStatusText: {
+    fontSize: 14,
+    color: Colors.light.tint, // O un color que prefieras para "Neutro"
+    marginBottom: 8,
+  },
+  tacticalStatusRed: {
+    color: 'red', // Color para el estado "Rojo"
   },
   // --- ESTILOS COPIADOS DE match-analysis.tsx (o idealmente, refactorizados) ---
   tacticalSchemeContainer: {

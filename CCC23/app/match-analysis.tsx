@@ -4,10 +4,12 @@ import { ActivityIndicator, StyleSheet, ScrollView, Alert, View, TouchableOpacit
 import { useLocalSearchParams, Stack, useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+import { useIsFocused } from '@react-navigation/native'; // Importar useIsFocused
 import { ThemedView } from '@/components/ThemedView';
 import { ThemedText } from '@/components/ThemedText';
 import { scrapeMatchAnalysis, MatchAnalysisDetails, PlayerInfo } from '@/api/analisis';
 import { TeamTierType } from '@/api/scraper'; // Importar TeamTierType
+import { PostScudettoMatchInfo } from '@/api/postscudetto'; // Para tipar los datos de AsyncStorage
 
 // --- DEFINICIONES Y CONSTANTES ---
 interface FormationSlot {
@@ -125,6 +127,13 @@ interface EnrichedMatchAnalysisDetails extends Omit<MatchAnalysisDetails, 'homeP
 }
 
 interface LoadTacticalLineupResult {
+  formation: FormationType | null;
+  players: Record<string, EnrichedPlayerInfo | null> | null;
+  loaded: boolean;
+}
+
+// Interfaz para la carga de datos de alineación específicos sin afectar el estado
+interface LoadedLineupData {
   formation: FormationType | null;
   players: Record<string, EnrichedPlayerInfo | null> | null;
   loaded: boolean;
@@ -271,6 +280,23 @@ export default function MatchAnalysisScreen() {
     }
   };
 
+  // Helper para cargar datos de una alineación específica sin modificar el estado global de la pantalla
+  const loadSpecificLineupData = async (loadKey: string): Promise<LoadedLineupData> => {
+    try {
+      const existingLineupsJson = await AsyncStorage.getItem(TACTICAL_LINEUPS_CACHE_KEY);
+      if (existingLineupsJson) {
+        const lineupsCache = JSON.parse(existingLineupsJson);
+        const lineupToLoad = lineupsCache[loadKey];
+        if (lineupToLoad) {
+          return { formation: lineupToLoad.formation, players: lineupToLoad.placedPlayers, loaded: true };
+        }
+      }
+      return { formation: null, players: null, loaded: false };
+    } catch (error) {
+      console.error(`Error loading specific lineup data for key ${loadKey}:`, error);
+      return { formation: null, players: null, loaded: false };
+    }
+  };
 
   const params = useLocalSearchParams<{
     matchUrl: string;
@@ -284,6 +310,7 @@ export default function MatchAnalysisScreen() {
   const router = useRouter();
   const matchUrl = params.matchUrl ? decodeURIComponent(params.matchUrl) : undefined;
   const matchIdentifier = params.matchIdentifier ? decodeURIComponent(params.matchIdentifier) : 'Partido';
+  const POST_SCUDETTO_DATA_KEY = 'postScudettoAllMatchData';
 
   const [analysisData, setAnalysisData] = useState<EnrichedMatchAnalysisDetails | null>(null);
   const [homeTeamActualTier, setHomeTeamActualTier] = useState<TeamTierType | null | undefined>(undefined);
@@ -302,6 +329,7 @@ export default function MatchAnalysisScreen() {
   const [homeLineupSnapshot, setHomeLineupSnapshot] = useState<Record<string, EnrichedPlayerInfo | null> | null>(null); // Ahora es EnrichedPlayerInfo
 
   const isEditingMode = params.isEditing === 'true';
+  const isFocused = useIsFocused(); // Hook para detectar si la pantalla está enfocada
 
   const areAllSlotsFilledForFormation = useCallback((formation: FormationType | null, players: Record<string, EnrichedPlayerInfo | null>): boolean => {
     if (!formation || !players) return false;
@@ -386,7 +414,7 @@ export default function MatchAnalysisScreen() {
       setIsLoading(true);
       setAnalysisData(null);
       setError(null);
-      setDisplayMessage("Cargando datos...");
+      // setDisplayMessage("Cargando datos..."); // Se maneja mejor con isLoading
       
       // Primero, determinar los tiers para saber cómo cargar/guardar
       const pTeamAName = params.teamAName ? decodeURIComponent(params.teamAName) : undefined;
@@ -400,11 +428,13 @@ export default function MatchAnalysisScreen() {
           tempAnalysisData = await scrapeMatchAnalysis(matchUrl);
           if (tempAnalysisData.error) {
               setError(tempAnalysisData.error);
+              setDisplayMessage(null);
               setIsLoading(false);
               return;
           }
       } catch (e: any) {
           setError(`Error al obtener el análisis del partido: ${e.message}`);
+          setDisplayMessage(null);
           setIsLoading(false);
           return;
       }
@@ -469,6 +499,7 @@ export default function MatchAnalysisScreen() {
       // Cargar la formación por defecto del coach para el foco inicial
       const coachDefault = await getCoachDefaultFormation(initialFocus, tempAnalysisData, determinedHomeTier, determinedAwayTier);
       // setSelectedFormation y setDisplayMessage se manejan dentro de loadTacticalLineup o después si no se carga nada
+      let lineupLoadedFromStorage = false;
       
       // Intentar cargar una alineación específica del partido
       if (matchUrl) {
@@ -476,11 +507,40 @@ export default function MatchAnalysisScreen() {
         if (loadResult.loaded && loadResult.formation && loadResult.players) {
           // setSelectedFormation y setPlacedPlayers ya se hicieron dentro de loadTacticalLineup
           setDisplayMessage(null); 
+
+          // *** RE-ENRIQUECER JUGADORES CARGADOS CON POSICIONES FRESCAS ***
+          // `enrichedHomePlayers` y `enrichedAwayPlayers` tienen las posiciones más recientes del caché global.
+          const freshlyEnrichedPlayersForCurrentFocus = initialFocus === 'home' ? enrichedHomePlayers : enrichedAwayPlayers;
+          const reEnrichedLoadedPlayers: Record<string, EnrichedPlayerInfo | null> = {};
+
+          for (const slotId in loadResult.players) {
+            const loadedPlayerInSlot = loadResult.players[slotId];
+            if (loadedPlayerInSlot && loadedPlayerInSlot.name) {
+              const correspondingFreshPlayer = freshlyEnrichedPlayersForCurrentFocus.find(
+                fp => fp.name === loadedPlayerInSlot.name && (fp.number === loadedPlayerInSlot.number || (!fp.number && !loadedPlayerInSlot.number))
+              );
+              if (correspondingFreshPlayer) {
+                reEnrichedLoadedPlayers[slotId] = {
+                  ...loadedPlayerInSlot, // Mantener otros detalles del lineup guardado
+                  assignedPositions: correspondingFreshPlayer.assignedPositions, // Actualizar con posiciones frescas
+                };
+              } else {
+                reEnrichedLoadedPlayers[slotId] = loadedPlayerInSlot; // Jugador no encontrado en la lista fresca, mantener como estaba cargado
+              }
+            } else {
+              reEnrichedLoadedPlayers[slotId] = loadedPlayerInSlot; // Slot vacío o jugador sin nombre
+            }
+          }
+          setPlacedPlayers(reEnrichedLoadedPlayers); // Actualizar el estado de placedPlayers
+
+          lineupLoadedFromStorage = true;
           
           if (!isEditingMode) {
             const isCurrentFocusTierS = initialFocus === 'home' ? isTierSOrSRed(determinedHomeTier) : isTierSOrSRed(determinedAwayTier);
-            if (isCurrentFocusTierS && areAllSlotsFilledForFormation(loadResult.formation, loadResult.players)) {
-              console.log(`[AutoRedirect] Alineación completa cargada para ${initialFocus} team. Redirigiendo a resumen.`);
+            // Usar reEnrichedLoadedPlayers para la condición de llenado también es más preciso.
+            if (isCurrentFocusTierS && areAllSlotsFilledForFormation(loadResult.formation, reEnrichedLoadedPlayers)) {
+              console.log(`[AutoRedirect] Alineación completa (${initialFocus}) llena. Redirigiendo a resumen.`);
+              
               
               let summaryParams: any = {
                 formation: loadResult.formation, // Usar la formación cargada
@@ -492,35 +552,54 @@ export default function MatchAnalysisScreen() {
                 teamBTier: params.teamBTier,
               };
 
-              if (isTierSOrSRed(determinedHomeTier) && isTierSOrSRed(determinedAwayTier)) { 
-                summaryParams.homeLineup = JSON.stringify(initialFocus === 'home' ? loadResult.players : homeLineupSnapshot || {}); 
-                summaryParams.awayLineup = JSON.stringify(initialFocus === 'away' ? loadResult.players : {}); 
+              if (isTierSOrSRed(determinedHomeTier) && isTierSOrSRed(determinedAwayTier)) {
+                let finalHomeLineupJson = "{}";
+                let finalAwayLineupJson = "{}";
+
+                if (initialFocus === 'home') {
+                  finalHomeLineupJson = JSON.stringify(reEnrichedLoadedPlayers);
+                  const awayData = await loadSpecificLineupData(matchUrl + "_away");
+                  if (awayData.loaded && awayData.players) {
+                    finalAwayLineupJson = JSON.stringify(awayData.players);
+                  }
+                } else { // initialFocus === 'away'
+                  finalAwayLineupJson = JSON.stringify(reEnrichedLoadedPlayers);
+                  const homeData = await loadSpecificLineupData(matchUrl + "_home");
+                  if (homeData.loaded && homeData.players) {
+                    finalHomeLineupJson = JSON.stringify(homeData.players);
+                  }
+                }
+                summaryParams.homeLineup = finalHomeLineupJson;
+                summaryParams.awayLineup = finalAwayLineupJson;
                 summaryParams.homeTeamName = tempAnalysisData.homeTeamName;
                 summaryParams.awayTeamName = tempAnalysisData.awayTeamName;
-              } else { 
-                summaryParams.lineup1 = JSON.stringify(loadResult.players);
+
+              } else { // Solo un equipo TierS o el otro no es TierS
+                summaryParams.lineup1 = JSON.stringify(reEnrichedLoadedPlayers);
                 summaryParams.team1Name = initialFocus === 'home' ? tempAnalysisData.homeTeamName : tempAnalysisData.awayTeamName;
               }
               router.replace({ pathname: '/tactical-summary', params: summaryParams });
             }
           }
-        } else { // No se cargó alineación guardada, usar la del coach (si existe)
-            setSelectedFormation(coachDefault.formation);
-            setDisplayMessage(coachDefault.message);
-            if (!coachDefault.formation && !coachDefault.message) {
-                // RenderTacticalBoard se encargará del mensaje de no TierS.
-            }
-        }
-      } else { // No hay matchUrl (improbable aquí, pero por completitud)
-        setSelectedFormation(coachDefault.formation);
-        setDisplayMessage(coachDefault.message);
+        } 
       }
       
-      setAnalysisData({
+      // Si no se cargó una alineación del storage, usar la del coach (si existe)
+      // o limpiar si no hay coach/formación.
+      if (!lineupLoadedFromStorage) {
+        setSelectedFormation(coachDefault.formation);
+        setDisplayMessage(coachDefault.message);
+        if (!coachDefault.formation && !coachDefault.message && (isTierSOrSRed(determinedHomeTier) || isTierSOrSRed(determinedAwayTier))) {
+            // Si no hay formación del coach Y no hay mensaje de error del coach (ej. "Coach sin formación")
+            // Y el equipo actual SÍ es TierS, entonces inicializar el tablero vacío para la formación seleccionada (si la hay)
+            // o dejarlo para que el usuario seleccione una.
+        }
+      }      
+      const currentAnalysisData = { // Guardar en una variable para usarla inmediatamente
         ...tempAnalysisData,
         homePlayers: enrichedHomePlayers,
         awayPlayers: enrichedAwayPlayers,
-      });
+      };
 
       if (tempAnalysisData.homePlayers) {
         await updatePlayersCache(tempAnalysisData.homePlayers, tempAnalysisData.homeTeamName, determinedHomeTier, tempAnalysisData.homeManager);
@@ -528,11 +607,12 @@ export default function MatchAnalysisScreen() {
       if (tempAnalysisData.awayPlayers) {
         await updatePlayersCache(tempAnalysisData.awayPlayers, tempAnalysisData.awayTeamName, determinedAwayTier, tempAnalysisData.awayManager);
       }
+      setAnalysisData(currentAnalysisData); // Establecer los datos de análisis finales
       setIsLoading(false);
     };
 
     fetchAndLoad();
-  }, [matchUrl, params.teamAName, params.teamATier, params.teamBName, params.teamBTier, isEditingMode]); // Añadir isEditingMode
+  }, [matchUrl, params.teamAName, params.teamATier, params.teamBName, params.teamBTier, isEditingMode, isFocused]); // Añadir isFocused
 
 
   // Efecto para ajustar el foco del equipo basado en los tiers (después de que se establezcan)
@@ -556,7 +636,38 @@ export default function MatchAnalysisScreen() {
 
   }, [homeTeamActualTier, awayTeamActualTier]);
 
-  const determineSaveKeyAndSave = useCallback((teamToSave: 'home' | 'away', lineupToSave: Record<string, EnrichedPlayerInfo | null>) => {
+  // Devuelve 'Neutro', 'Rojo', o null (si no hay jugadores o datos)
+  const getLineupTacticalStatus = useCallback((
+    lineupToCheck: Record<string, EnrichedPlayerInfo | null> | null,
+    formationToCheck: FormationType | null
+  ): 'Neutro' | 'Rojo' | null => {
+    if (!formationToCheck || !lineupToCheck || Object.keys(lineupToCheck).length === 0 || !FORMATION_DEFINITIONS[formationToCheck]) {
+      return null;
+    }
+    const currentFormationLayout = FORMATION_DEFINITIONS[formationToCheck];
+    let hasPlacedPlayers = false;
+    let hasMisplacedPlayer = false;
+
+    for (const slot of currentFormationLayout) {
+      const playerInSlot = lineupToCheck[slot.id];
+      if (playerInSlot) {
+        hasPlacedPlayers = true;
+        if (!playerInSlot.assignedPositions || playerInSlot.assignedPositions.length === 0) {
+          hasMisplacedPlayer = true; 
+        } else {
+          // Solo llamar a .includes si assignedPositions es un array y tiene elementos
+          const isPlayerInCorrectPosition = playerInSlot.assignedPositions.includes(slot.label as ActualPlayerPositionType);
+          if (!isPlayerInCorrectPosition) {
+            hasMisplacedPlayer = true;
+          }
+        }
+      }
+    }
+    if (!hasPlacedPlayers) return null;
+    return hasMisplacedPlayer ? 'Rojo' : 'Neutro';
+  }, []);
+
+  const determineSaveKeyAndSave = useCallback(async (teamToSave: 'home' | 'away', lineupToSave: Record<string, EnrichedPlayerInfo | null>) => {
     if (!matchUrl || !selectedFormation || !Object.values(lineupToSave).some(p => p !== null)) {
         console.log(`[TacticalSave] No se guardó para ${teamToSave} (match: ${matchUrl}). Razón: datos insuficientes o tablero vacío.`);
         return;
@@ -583,16 +694,76 @@ export default function MatchAnalysisScreen() {
     }
 
     if (shouldSave) {
-        saveTacticalLineup(keyToSave, selectedFormation, lineupToSave);
+        await saveTacticalLineup(keyToSave, selectedFormation, lineupToSave); // saveTacticalLineup es async
+
+        // Después de guardar, actualizar el Status del partido en POST_SCUDETTO_DATA_KEY
+        let overallTacticalStatus: 'Neutro' | 'Rojo' | null = null;
+
+        if (homeIsS && awayIsS) { // Escenario de dos equipos TierS
+            const homeLineupKey = matchUrl + "_home";
+            const awayLineupKey = matchUrl + "_away";
+
+            const homeData = await loadSpecificLineupData(homeLineupKey);
+            const awayData = await loadSpecificLineupData(awayLineupKey);
+
+            // Lógica específica para TierS vs TierSred
+            if (homeTeamActualTier === "TierS" && awayTeamActualTier === "TierSred") {
+                overallTacticalStatus = homeData.loaded ? getLineupTacticalStatus(homeData.players, homeData.formation) : null;
+            } else if (homeTeamActualTier === "TierSred" && awayTeamActualTier === "TierS") {
+                overallTacticalStatus = awayData.loaded ? getLineupTacticalStatus(awayData.players, awayData.formation) : null;
+            } else {
+                // Lógica original para otros pares TierS/SRed (ej. S vs S, SRed vs SRed) o si no es S vs SRed
+                const homeStatus = homeData.loaded ? getLineupTacticalStatus(homeData.players, homeData.formation) : null;
+                const awayStatus = awayData.loaded ? getLineupTacticalStatus(awayData.players, awayData.formation) : null;
+
+                if (homeStatus === 'Rojo' || awayStatus === 'Rojo') {
+                    overallTacticalStatus = 'Rojo';
+                } else if (homeStatus === 'Neutro' && awayStatus === 'Neutro') {
+                    overallTacticalStatus = 'Neutro';
+                }
+            }
+        } else { // Escenario de un solo equipo TierS (o el otro no es TierS)
+            overallTacticalStatus = getLineupTacticalStatus(lineupToSave, selectedFormation);
+        }
+
+        // Actualizar AsyncStorage para POST_SCUDETTO_DATA_KEY
+        const storedDataJson = await AsyncStorage.getItem(POST_SCUDETTO_DATA_KEY);
+        if (storedDataJson) {
+            let allMatches: PostScudettoMatchInfo[] = JSON.parse(storedDataJson);
+            const decodedMatchUrl = decodeURIComponent(matchUrl); // matchUrl ya está decodificado arriba
+            const matchIndex = allMatches.findIndex(m => m.match === decodedMatchUrl);
+
+            if (matchIndex !== -1) {
+                const currentMatchStatus = allMatches[matchIndex].Status;
+                if (currentMatchStatus !== 'Champion' && currentMatchStatus !== 'Post scudetto' && currentMatchStatus !== 'Negativo') {
+                    if (overallTacticalStatus === 'Neutro' || overallTacticalStatus === 'Rojo') {
+                        allMatches[matchIndex].Status = overallTacticalStatus;
+                        console.log(`[MatchAnalysisSave] Match ${decodedMatchUrl} Status updated to ${overallTacticalStatus}.`);
+                    } else { // overallTacticalStatus es null (o indeterminado)
+                        // Si el estado actual era 'Neutro' o 'Rojo', lo limpiamos.
+                        if (currentMatchStatus === "Neutro" || currentMatchStatus === "Rojo") {
+                            allMatches[matchIndex].Status = null; 
+                            console.log(`[MatchAnalysisSave] Match ${decodedMatchUrl} Status reverted from ${currentMatchStatus}.`);
+                        }
+                    }
+                }
+                await AsyncStorage.setItem(POST_SCUDETTO_DATA_KEY, JSON.stringify(allMatches));
+            }
+        }
+
     } else {
         console.log(`[TacticalSave] No se guardó para ${teamToSave} (match: ${matchUrl}). Razón: El equipo no es TierS/SRed o no se cumplió otra condición.`);
     }
-}, [matchUrl, selectedFormation, homeTeamActualTier, awayTeamActualTier, saveTacticalLineup]); // Incluir saveTacticalLineup si es estable
+}, [matchUrl, selectedFormation, homeTeamActualTier, awayTeamActualTier, saveTacticalLineup, getLineupTacticalStatus, loadSpecificLineupData, POST_SCUDETTO_DATA_KEY]);
 
   // Guardar alineación al desmontar el componente
   useEffect(() => {
     return () => {
-        determineSaveKeyAndSave(currentTeamFocus, placedPlayers);
+        // Envolver la llamada en una función async para manejar la promesa
+        const performSaveAndStatusUpdate = async () => {
+            await determineSaveKeyAndSave(currentTeamFocus, placedPlayers);
+        };
+        performSaveAndStatusUpdate();
     };
   }, [determineSaveKeyAndSave, currentTeamFocus, placedPlayers]); // placedPlayers es importante aquí
 
@@ -616,7 +787,7 @@ export default function MatchAnalysisScreen() {
   };
 
   const handleSwitchToAwayTeam = async () => {
-    determineSaveKeyAndSave('home', placedPlayers); // Guardar la del local (home)
+    await determineSaveKeyAndSave('home', placedPlayers); // Guardar la del local (home)
     setCurrentTeamFocus('away');
     setHomeLineupSnapshot(placedPlayers); // Guardar snapshot de la alineación local
 
@@ -642,7 +813,7 @@ export default function MatchAnalysisScreen() {
   };
 
   const handleSwitchToHomeTeam = async () => {
-    determineSaveKeyAndSave('away', placedPlayers); // Guardar la del visitante (away)
+    await determineSaveKeyAndSave('away', placedPlayers); // Guardar la del visitante (away)
     setCurrentTeamFocus('home');
 
     const coachDefault = await getCoachDefaultFormation('home', analysisData!, homeTeamActualTier, awayTeamActualTier);
@@ -750,7 +921,7 @@ export default function MatchAnalysisScreen() {
           {teamName && <ThemedText type="label" style={styles.playerListTitle}>{teamName}</ThemedText>}
           <ThemedText>Análisis táctico no disponible para este equipo (no es TierS/SRed).</ThemedText>
         </View>
-      );
+      ); // No mostrar lista de jugadores si el equipo actual no es TierS
     }
     if (!analysisData) return null; // No renderizar nada si no hay datos de análisis
 
@@ -968,8 +1139,8 @@ export default function MatchAnalysisScreen() {
         {selectedFormation && areAllSlotsFilled() && currentTeamFocus === 'home' &&
          homeIsS && !awayIsS && analysisData && (
           <TouchableOpacity
-            onPress={() => {
-              determineSaveKeyAndSave('home', placedPlayers);
+            onPress={async () => {
+              await determineSaveKeyAndSave('home', placedPlayers);
               router.push({
                 pathname: '/tactical-summary',
                 params: {
@@ -992,8 +1163,8 @@ export default function MatchAnalysisScreen() {
         {selectedFormation && areAllSlotsFilled() && currentTeamFocus === 'away' &&
          !homeIsS && awayIsS && analysisData && (
           <TouchableOpacity
-            onPress={() => {
-              determineSaveKeyAndSave('away', placedPlayers);
+            onPress={async () => {
+              await determineSaveKeyAndSave('away', placedPlayers);
               router.push({
                 pathname: '/tactical-summary',
                 params: {
@@ -1017,8 +1188,8 @@ export default function MatchAnalysisScreen() {
          homeIsS && awayIsS && 
          analysisData && homeLineupSnapshot && (
           <TouchableOpacity
-            onPress={() => {
-              determineSaveKeyAndSave('away', placedPlayers); // Guardar la del visitante (actualmente en foco)
+            onPress={async () => {
+              await determineSaveKeyAndSave('away', placedPlayers); // Guardar la del visitante (actualmente en foco)
               router.push({
                 pathname: '/tactical-summary',
                 params: {
