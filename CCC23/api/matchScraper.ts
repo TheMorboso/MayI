@@ -1,3 +1,4 @@
+// c/Users/Mauri/Desktop/CCC23/MayI/CCC23/api/matchScraper.ts
 import * as cheerio from 'cheerio/slim';
 
 export interface MatchDetails {
@@ -60,7 +61,25 @@ export async function scrapeMatchDetails(
         week = new URL(week, baseSiteUrl).href;
       }
       const fecha = row.find('td:nth-child(2) > a').text().trim() || row.find('td:nth-child(2)').text().trim() || null;
-      const hora = row.find('td:nth-child(3)').text().trim() || null;
+      let hora = row.find('td:nth-child(3)').text().trim() || null;
+
+      // Ajustar la hora restando 6 horas
+      if (hora && hora.includes(':')) {
+        const timeParts = hora.split(':');
+        if (timeParts.length === 2) {
+          let hours = parseInt(timeParts[0], 10);
+          const minutes = parseInt(timeParts[1], 10);
+
+          if (!isNaN(hours) && !isNaN(minutes)) {
+            hours -= 6;
+            if (hours < 0) {
+              hours += 24; // Ajustar para el día anterior si es necesario
+            }
+            hora = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+          }
+        }
+      }
+
       const lugar = row.find('td:nth-child(4)').text().trim() || null;
       const equipoContrario = row.find('td:nth-child(6) > a').text().trim() || null;
       
@@ -71,6 +90,11 @@ export async function scrapeMatchDetails(
       if (matchLink && !matchLink.startsWith('http')) {
         const baseSiteUrl = new URL(fullUrl).origin;
         matchLink = new URL(matchLink, baseSiteUrl).href;
+      }
+
+      // Eliminar "/liveticker/" si está presente en matchLink
+      if (matchLink && matchLink.includes('/liveticker/')) {
+        matchLink = matchLink.replace('/liveticker/', '/');
       }
 
       if (fecha && (equipoContrario || resultado || week )) {

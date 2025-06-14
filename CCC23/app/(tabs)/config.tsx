@@ -28,12 +28,6 @@ export default function ConfigScreen() {
   const [playersJsonData, setPlayersJsonData] = useState<string | null>(null);
   const [isLoadingPlayersJson, setIsLoadingPlayersJson] = useState(false);
 
-  // Nuevos estados para el JSON de Alineaciones Tácticas
-  const TACTICAL_LINEUPS_CACHE_KEY_CONFIG = 'tacticalLineupsCache';
-  const [isTacticalLineupsJsonVisible, setIsTacticalLineupsJsonVisible] = useState(false);
-  const [tacticalLineupsJsonData, setTacticalLineupsJsonData] = useState<string | null>(null);
-  const [isLoadingTacticalLineupsJson, setIsLoadingTacticalLineupsJson] = useState(false);
-
 
   useEffect(() => {
     const loadSavedSeason = async () => {
@@ -99,33 +93,6 @@ export default function ConfigScreen() {
     }
   };
 
-  const handleToggleTacticalLineupsJsonData = async () => {
-    if (isTacticalLineupsJsonVisible) {
-      setIsTacticalLineupsJsonVisible(false);
-    } else {
-      setIsLoadingTacticalLineupsJson(true);
-      setTacticalLineupsJsonData(null);
-      try {
-        const existingJson = await AsyncStorage.getItem(TACTICAL_LINEUPS_CACHE_KEY_CONFIG);
-        if (existingJson !== null) {
-          try {
-            const parsedJson = JSON.parse(existingJson);
-            setTacticalLineupsJsonData(JSON.stringify(parsedJson, null, 2));
-          } catch (parseError) {
-            setTacticalLineupsJsonData(existingJson);
-          }
-        } else {
-          setTacticalLineupsJsonData(`No hay datos guardados bajo la clave "${TACTICAL_LINEUPS_CACHE_KEY_CONFIG}".`);
-        }
-      } catch (e) {
-        setTacticalLineupsJsonData('Error al cargar los datos de alineaciones tácticas.');
-      } finally {
-        setIsLoadingTacticalLineupsJson(false);
-        setIsTacticalLineupsJsonVisible(true);
-      }
-    }
-  };
-
   const handleSaveSeason = async () => {
     if (!seasonInput.match(/^\d{4}$/)) {
       Alert.alert('Error', 'Por favor, ingresa un año válido (4 dígitos).');
@@ -169,33 +136,6 @@ export default function ConfigScreen() {
       ]
     );
   };
-
-  const handleDeleteTacticalLineupsJson = async () => {
-    Alert.alert(
-      "Confirmar Eliminación",
-      "¿Estás seguro de que quieres eliminar todas las alineaciones tácticas guardadas? Esta acción no se puede deshacer.",
-      [
-        {
-          text: "Cancelar",
-          style: "cancel"
-        },
-        {
-          text: "Eliminar Todo",
-          onPress: async () => {
-            try {
-              await AsyncStorage.removeItem(TACTICAL_LINEUPS_CACHE_KEY_CONFIG);
-              setTacticalLineupsJsonData(`Datos de alineaciones tácticas eliminados de "${TACTICAL_LINEUPS_CACHE_KEY_CONFIG}".`);
-              Alert.alert("Éxito", "Todas las alineaciones tácticas han sido eliminadas.");
-            } catch (e) {
-              Alert.alert("Error", "No se pudieron eliminar las alineaciones tácticas.");
-            }
-          },
-          style: "destructive"
-        }
-      ]
-    );
-  };
-
 
   return (
     <ThemedView style={styles.container}>
@@ -275,31 +215,6 @@ export default function ConfigScreen() {
         </ScrollView>
       )}
 
-      <View style={styles.sectionContainer}>
-        <ThemedText type="subtitle" style={styles.sectionTitle}>Alineaciones Tácticas Guardadas</ThemedText>
-        <View style={styles.playersJsonButtonsContainer}>
-          <Button
-            title={isTacticalLineupsJsonVisible ? "Ocultar JSON" : "Mostrar JSON"}
-            onPress={handleToggleTacticalLineupsJsonData}
-            color={Platform.OS === 'ios' ? Colors.light.tint : undefined}
-          />
-          <View style={{ width: 10 }} /> 
-          <Button
-            title="Eliminar JSON"
-            onPress={handleDeleteTacticalLineupsJson}
-            color={Platform.OS === 'ios' ? (colorScheme === 'dark' ? Colors.dark.error : '#FF3B30') : '#FF3B30'}
-          />
-        </View>
-      </View>
-
-      {isTacticalLineupsJsonVisible && isLoadingTacticalLineupsJson && (
-        <ActivityIndicator size="large" style={styles.loader} />
-      )}
-      {isTacticalLineupsJsonVisible && !isLoadingTacticalLineupsJson && tacticalLineupsJsonData !== null && (
-        <ScrollView style={[styles.jsonContainer, { borderColor: colorScheme === 'dark' ? '#555' : '#ccc'}]}>
-          <ThemedText style={[styles.jsonText, { color: textColor }]}>{tacticalLineupsJsonData}</ThemedText>
-        </ScrollView>
-      )}
     </ThemedView>
   );
 }

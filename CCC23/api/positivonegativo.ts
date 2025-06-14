@@ -1,3 +1,4 @@
+// c/Users/Mauri/Desktop/CCC23/MayI/CCC23/api/positivonegativo.ts
 import { PostScudettoMatchInfo } from './postscudetto'; // Importar la interfaz correcta
 
 export function processPositiveNegative(
@@ -11,6 +12,11 @@ export function processPositiveNegative(
   return matches.map((currentMatch, index, allMatchesArray) => {
     const updatedMatch = { ...currentMatch }; // Clonar el partido actual
 
+    // NUEVA REGLA: Si opponentTier es "TierA", reemplazar equipoContrario por "TierA"
+    if (updatedMatch.opponentTier === "TierA") {
+      updatedMatch.equipoContrario = "TierA";
+    }
+
     // REGLA GENERAL PARA TIER "RED": Siempre "Negativo" si el equipo o el oponente es "Red"
     if (updatedMatch.tier === "Red" || updatedMatch.opponentTier === "Red") {
       updatedMatch.Status = "Negativo";
@@ -19,6 +25,16 @@ export function processPositiveNegative(
     // NUEVA REGLA: TierSred vs TierSred siempre es "Negativo"
     if (updatedMatch.tier === "TierSred" && updatedMatch.opponentTier === "TierSred") {
       updatedMatch.Status = "Negativo";
+    }
+
+    // NUEVA REGLA: Partido de liga principal vs TierA es "Negativo"
+    if (updatedMatch.Competicion &&
+        savedTeamsFirstNavLinkTexts.includes(updatedMatch.Competicion) && // Es una liga principal
+        updatedMatch.opponentTier === "TierA") { // opponentTier ya sería "TierA" si la regla anterior aplicó, pero la condición original se mantiene por claridad
+      // Solo aplicar si el Status actual no es Champion o Post scudetto, para no sobrescribirlos.
+      if (updatedMatch.Status !== "Champion" && updatedMatch.Status !== "Post scudetto") {
+        updatedMatch.Status = "Negativo";
+      }
     }
 
     // Lógica para partidos de "Competencia"
@@ -110,23 +126,25 @@ export function processPositiveNegative(
       }
 
       // Regla 3 (NUEVA): Amistoso donde el oponente juega en la misma liga principal que el equipo del amistoso.
-      const opponentName = updatedMatch.equipoContrario;
+      const opponentName = updatedMatch.equipoContrario; // Ya podría ser "TierA" si la regla de arriba aplicó
       const mainTeamActualLeague = updatedMatch.teamMainLeague; // Liga principal del equipo del amistoso
 
-      if (opponentName && mainTeamActualLeague && savedTeamsFirstNavLinkTexts.includes(mainTeamActualLeague)) {
-        // El equipo principal del amistoso pertenece a una liga principal reconocida.
-        // Verificamos si el oponente ha jugado partidos EN ESA MISMA LIGA.
+      // Si el oponente es "TierA", esta regla no debería aplicar de la misma forma,
+      // ya que "TierA" no es un nombre de equipo real para buscar en `allMatchesArray`.
+      // La lógica original de esta regla buscaba si el `opponentName` (original) jugaba en la misma liga.
+      // Si `opponentName` ahora es "TierA", la búsqueda `anyMatch.Team === "TierA"` no encontrará nada.
+      // Por lo tanto, esta regla se vuelve menos efectiva si el nombre ya fue reemplazado.
+      // Consideraremos si esta regla debe ejecutarse ANTES del reemplazo de nombre o si su lógica debe adaptarse.
+      // Por ahora, la dejamos tal cual, pero su efectividad cambia.
+      if (opponentName && opponentName !== "TierA" && mainTeamActualLeague && savedTeamsFirstNavLinkTexts.includes(mainTeamActualLeague)) {
         let opponentGamesInMainTeamLeague = 0;
         for (const anyMatch of allMatchesArray) {
-          // Considerar solo partidos de la liga específica del equipo principal del amistoso
           if (anyMatch.Competicion === mainTeamActualLeague) {
-            // Si el oponente fue el equipo local o visitante en un partido de esa liga
             if (anyMatch.Team === opponentName || anyMatch.equipoContrario === opponentName) {
               opponentGamesInMainTeamLeague++;
             }
           }
         }
-        // Si el oponente ha jugado al menos 1 partido en la misma liga que el equipo principal del amistoso
         if (opponentGamesInMainTeamLeague > 0) {
           updatedMatch.Status = "Negativo";
         }
@@ -134,19 +152,16 @@ export function processPositiveNegative(
 
       // Regla 4 (ANTERIOR GENERAL, AHORA AJUSTADA):
       // Si el oponente no tiene NINGUNA experiencia en CUALQUIER liga principal.
-      // Esta regla se evalúa independientemente de las anteriores que también asignan "Negativo".
-      if (opponentName && opponentName.trim() !== "") {
+      // Similar a la Regla 3, si `opponentName` es "TierA", esta regla no funcionará como antes.
+      if (opponentName && opponentName.trim() !== "" && opponentName !== "TierA") {
         let opponentTotalGamesInAnyMainLeague = 0;
         for (const otherMatch of allMatchesArray) {
-          // Verificar si otherMatch.Competicion es una de las ligas principales
           if (otherMatch.Competicion && savedTeamsFirstNavLinkTexts.includes(otherMatch.Competicion)) {
-            // Si el oponente fue el equipo local o visitante en CUALQUIER partido de liga principal
             if (otherMatch.Team === opponentName || otherMatch.equipoContrario === opponentName) {
               opponentTotalGamesInAnyMainLeague++;
             }
           }
         }
-        // Si el oponente no ha jugado NINGÚN partido en CUALQUIER liga principal.
         if (opponentTotalGamesInAnyMainLeague === 0) {
           updatedMatch.Status = "Negativo";
         }
@@ -154,19 +169,15 @@ export function processPositiveNegative(
     }
 
     // LÓGICA PARA PARTIDOS DE LIGA POSTERGADOS:
-    // Si un partido de liga (currentMatch) tiene una 'Ronda' menor que la 'Ronda'
-    // del partido de liga ANTERIOR del mismo equipo, entonces currentMatch se considera postergado
-    // y se marca como "Negativo".
     if (updatedMatch.Team &&
         updatedMatch.Competicion &&
-        savedTeamsFirstNavLinkTexts.includes(updatedMatch.Competicion) && // Es un partido de liga principal
-        updatedMatch.Ronda) { // El partido actual (updatedMatch) tiene una ronda
+        savedTeamsFirstNavLinkTexts.includes(updatedMatch.Competicion) && 
+        updatedMatch.Ronda) { 
 
       const currentRondaStr = updatedMatch.Ronda;
       const currentRondaNum = parseInt(currentRondaStr, 10);
 
-      if (!isNaN(currentRondaNum)) { // Asegurarse de que la ronda actual es un número válido
-        // Buscar el partido de LIGA ANTERIOR del MISMO EQUIPO que también tenga una RONDA válida
+      if (!isNaN(currentRondaNum)) { 
         for (let j = index - 1; j >= 0; j--) {
           const prevMatchCandidate = allMatchesArray[j];
           if (prevMatchCandidate.Team === updatedMatch.Team &&
@@ -177,14 +188,11 @@ export function processPositiveNegative(
             const prevRondaStr = prevMatchCandidate.Ronda;
             const prevRondaNum = parseInt(prevRondaStr, 10);
 
-            // Si la ronda anterior es mayor que la ronda actual (ej. prev: 26, current: 15)
             if (!isNaN(prevRondaNum) && prevRondaNum > currentRondaNum) {
-              // No aplicar esta regla de "Negativo" si el equipo contrario es TierS
               if (updatedMatch.opponentTier !== "TierS") {
                 updatedMatch.Status = "Negativo";
               }
             }
-            // Encontramos el partido de liga anterior relevante, no necesitamos seguir buscando hacia atrás para este updatedMatch
             break; 
           }
         }
@@ -196,14 +204,12 @@ export function processPositiveNegative(
         updatedMatch.Competicion &&
         savedTeamsFirstNavLinkTexts.includes(updatedMatch.Competicion)) {
 
-      // Solo aplicar si el Status actual no es Champion o Post scudetto
       if (updatedMatch.Status !== "Champion" && updatedMatch.Status !== "Post scudetto") {
         let prevMatchOfSameTeam: PostScudettoMatchInfo | null = null;
-        // Buscar el partido inmediatamente anterior del mismo equipo
         for (let i = index - 1; i >= 0; i--) {
           if (allMatchesArray[i].Team === updatedMatch.Team) {
             prevMatchOfSameTeam = allMatchesArray[i];
-            break; // Encontramos el partido anterior más reciente del mismo equipo
+            break; 
           }
         }
 
@@ -224,7 +230,6 @@ export function processPositiveNegative(
         savedTeamsFirstNavLinkTexts.includes(updatedMatch.Competicion) &&
         updatedMatch.lugar === "A") {
 
-      // Solo aplicar si el Status actual no es Champion o Post scudetto
       if (updatedMatch.Status !== "Champion" && updatedMatch.Status !== "Post scudetto") {
         let prevMatchOfSameTeam: PostScudettoMatchInfo | null = null;
         for (let i = index - 1; i >= 0; i--) {
@@ -250,10 +255,9 @@ export function processPositiveNegative(
     }
 
     // NUEVAS REGLAS ESPECIALES PARA PREMIER LEAGUE
-    const PREMIER_LEAGUE_COMPETITION_NAME = "Premier League"; // Asegúrate que este string coincida con el usado en organizador.ts
+    const PREMIER_LEAGUE_COMPETITION_NAME = "Premier League"; 
 
     if (updatedMatch.Competicion === PREMIER_LEAGUE_COMPETITION_NAME && updatedMatch.Team) {
-      // Solo aplicar estas reglas si el Status actual no es Champion o Post scudetto
       if (updatedMatch.Status !== "Champion" && updatedMatch.Status !== "Post scudetto") {
         let prevMatchOfSameTeam: PostScudettoMatchInfo | null = null;
         for (let i = index - 1; i >= 0; i--) {
@@ -271,7 +275,6 @@ export function processPositiveNegative(
           }
         }
 
-        // Regla 1: Partido de Premier League entre dos partidos de "Competicion"
         if (
           prevMatchOfSameTeam && prevMatchOfSameTeam.Competicion === "Competicion" &&
           nextMatchOfSameTeam && nextMatchOfSameTeam.Competicion === "Competicion"
@@ -279,14 +282,13 @@ export function processPositiveNegative(
           updatedMatch.Status = "Negativo";
         }
 
-        // Regla 2: Partido de Premier League después de un "Parón Internacional"
-        // Esta regla se evalúa incluso si la Regla 1 ya aplicó "Negativo".
         if (prevMatchOfSameTeam && prevMatchOfSameTeam.Competicion === "Parón Internacional") {
           updatedMatch.Status = "Negativo";
         }
       }
     }
 
-    return updatedMatch; // Devolver el partido (modificado o no)
+    return updatedMatch;
   });
 }
+ 

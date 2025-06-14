@@ -1,5 +1,5 @@
 // c/Users/Mauri/Desktop/CCC23/MayI/CCC23/app/(tabs)/matches.tsx
-import React, { useState, useEffect, useCallback } from 'react'; 
+import React, { useState, useEffect, useCallback } from 'react';
 import { StyleSheet, View, Button, Platform, ActivityIndicator, Alert, ScrollView, Modal, TouchableOpacity, FlatList, Image } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation, useRouter } from 'expo-router';
@@ -50,7 +50,7 @@ export default function MatchesScreen() {
   useEffect(() => {
     navigation.setOptions({
       headerRight: () => (
-        <TouchableOpacity 
+        <TouchableOpacity
             onPress={() => {
               if (postScudettoData) {
                 setIsPostScudettoJsonModalVisible(true);
@@ -95,7 +95,7 @@ export default function MatchesScreen() {
       );
 
       const finalFilteredMatches: PostScudettoMatchInfo[] = [];
-      const dailyProcessedPairKeys = new Set<string>(); 
+      const dailyProcessedPairKeys = new Set<string>();
 
       for (const match of rawMatchesForDate) {
         let isSpecialPairWithNegativeStatus = false;
@@ -120,7 +120,7 @@ export default function MatchesScreen() {
             continue;
           }
           dailyProcessedPairKeys.add(pairKey);
-          finalFilteredMatches.push(match); 
+          finalFilteredMatches.push(match);
         } else {
           finalFilteredMatches.push(match);
         }
@@ -128,13 +128,13 @@ export default function MatchesScreen() {
       setFilteredDailyMatches(finalFilteredMatches);
 
       if (isDailyJsonScrollViewVisible) {
-        if (finalFilteredMatches.length > 0) { 
+        if (finalFilteredMatches.length > 0) {
           setDailyMatchesJson(JSON.stringify(finalFilteredMatches, null, 2));
         } else {
           setDailyMatchesJson(`No hay partidos para el ${formattedSelectedDate} (después de filtrar duplicados).`);
         }
       }
-    } else { 
+    } else {
       setFilteredDailyMatches([]);
       if (isDailyJsonScrollViewVisible) {
         setDailyMatchesJson("No hay datos de partidos cargados o procesados. Por favor, realiza el scrapeo.");
@@ -204,7 +204,7 @@ export default function MatchesScreen() {
       const savedSeason = await AsyncStorage.getItem(SEASON_STORAGE_KEY);
 
       for (const team of savedTeams) {
-        if (team.tier === 'TierA' || team.tier === 'Red') continue; 
+        if (team.tier === 'TierA' || team.tier === 'Red') continue;
         if (!team.originalUrl) {
           allScrapedMatches.push({ Team: team.teamName || 'unknown_team_name_in_loop', error: 'URL original no encontrada.' });
           continue;
@@ -245,7 +245,7 @@ export default function MatchesScreen() {
   const handleProcessPostScudetto = async (
     currentOrganizedData: OrganizedMatchInfo[],
     leagueCompetitionNames: string[],
-    previouslyStoredData: PostScudettoMatchInfo[] | null 
+    previouslyStoredData: PostScudettoMatchInfo[] | null
   ) => {
     if (!currentOrganizedData || currentOrganizedData.length === 0) {
       setPostScudettoData(null);
@@ -259,10 +259,10 @@ export default function MatchesScreen() {
       if (previouslyStoredData && correctedData) {
         const finalCorrectedDataWithTacticalStatus = correctedData.map(newMatch => {
           const oldMatch = previouslyStoredData.find(
-            om => om.match === newMatch.match && 
-                  om.Team === newMatch.Team    
+            om => om.match === newMatch.match &&
+                  om.Team === newMatch.Team
           );
-          if (oldMatch && (oldMatch.Status === "Neutro" || oldMatch.Status === "Rojo" || oldMatch.Status === "Naranja")) {
+          if (oldMatch && (oldMatch.Status === "Neutro" || oldMatch.Status === "Rojo" || oldMatch.Status === "Naranja" || oldMatch.Status === "Verde")) {
             if (newMatch.Status !== "Champion" && newMatch.Status !== "Post scudetto" && newMatch.Status !== "Negativo") {
               return { ...newMatch, Status: oldMatch.Status };
             }
@@ -299,14 +299,15 @@ export default function MatchesScreen() {
     if (matchItem.match && matchItem.match.trim() !== '') {
       const matchIdentifier = `${matchItem.Team || 'Equipo'} vs ${matchItem.equipoContrario || 'Oponente'} (${matchItem.fecha})`;
       router.push({
-        pathname: `/match-analysis`,
+        pathname: `/match-analysis`, 
         params: {
           matchUrl: encodeURIComponent(matchItem.match),
           matchIdentifier: encodeURIComponent(matchIdentifier),
-          teamAName: matchItem.Team, 
-          teamATier: matchItem.tier, 
-          teamBName: matchItem.equipoContrario, 
-          teamBTier: matchItem.opponentTier, 
+          teamAName: matchItem.Team,
+          teamATier: matchItem.tier,
+          teamBName: matchItem.equipoContrario,
+          teamBTier: matchItem.opponentTier,
+          isEditing: 'true', // Go directly to editing mode
         },
       });
     } else {
@@ -330,6 +331,39 @@ export default function MatchesScreen() {
       item.Competicion === "Competicion" &&
       item.Status === "Negativo";
 
+    // --- W/L Indicator Logic ---
+    let wlIndicator: { text: 'W' | 'L'; styleKey: 'W' | 'L' } | null = null;
+    const isTierSMatch = item.tier === "TierS";
+    const isLocalCompetition = item.isMainLeagueCompetition === true;
+    const isCompeticionComp = item.Competicion === "Competicion";
+    const isNotSvsS = !(item.tier === "TierS" && item.opponentTier === "TierS");
+    
+    const canShowWL = item.Status !== "Post scudetto" && 
+                      item.Status !== "Negativo" && 
+                      item.Competicion !== "Amistoso" &&
+                      !(isCompeticionComp && item.tier === "TierS" && item.opponentTier === "TierS");
+
+
+    if (canShowWL && isTierSMatch && (isLocalCompetition || isCompeticionComp) && isNotSvsS && item.lugar && item.resultado) {
+      const scoreMatch = item.resultado.match(/^(\d+):(\d+)/);
+      if (scoreMatch) {
+        const score1 = parseInt(scoreMatch[1], 10); // Home score
+        const score2 = parseInt(scoreMatch[2], 10); // Away score
+
+        if (!isNaN(score1) && !isNaN(score2)) {
+          if (item.lugar === 'A') { // item.Team is the Away team
+            if (score2 <= score1) wlIndicator = { text: 'W', styleKey: 'W' }; // Away loses or draws => W
+            else if (score2 > score1) wlIndicator = { text: 'L', styleKey: 'L' };    // Away wins => L
+          } else if (item.lugar === 'H') { // item.Team is the Home team
+            if (score1 < score2) wlIndicator = { text: 'L', styleKey: 'L' };     // Home loses => L
+            else if (score1 >= score2) wlIndicator = { text: 'W', styleKey: 'W' }; // Home wins or draws => W
+          }
+        }
+      }
+    }
+    // --- End W/L Indicator Logic ---
+
+
     if (
       item.Competicion === 'Parón Internacional' ||
       item.Status === 'Champion' ||
@@ -338,33 +372,45 @@ export default function MatchesScreen() {
     ) {
       let specialStyle = {};
       let text = '';
+      
       if (item.Competicion === 'Parón Internacional') {
         specialStyle = styles.internationalBreakItem; text = 'PARÓN INTERNACIONAL';
       } else {
         switch (item.Status) {
           case 'Champion': specialStyle = styles.championItem; text = 'CAMPEÓN'; break;
           case 'Post scudetto': specialStyle = styles.postScudettoItem; text = 'POST SCUDETTO'; break;
-          case 'Negativo': 
+          case 'Negativo':
             specialStyle = styles.negativoItem; text = 'NEGATIVO'; break;
         }
       }
       return (
         <TouchableOpacity onPress={() => handlePressMatchItem(item)} activeOpacity={item.match ? 0.7 : 1}>
           <View style={[styles.dailyMatchItemContainer, styles.statusHighlightItem, specialStyle]}>
-            <ThemedText style={styles.statusHighlightText}>{text}</ThemedText>
+            <View style={styles.statusHighlightContent}>
+              <ThemedText style={styles.statusHighlightText}>{text}</ThemedText>
+              {/* W/L Indicator for special status items - only if canShowWL was true before this block */}
+              {wlIndicator && item.lugar && ['H', 'A'].includes(item.lugar) && canShowWL && (
+                 <View style={[styles.wlIndicatorCircle, wlIndicator.styleKey === 'W' ? styles.wlIndicatorWBackground : styles.wlIndicatorLBackground]}>
+                   <ThemedText style={wlIndicator.styleKey === 'W' ? styles.wlIndicatorTextW : styles.wlIndicatorTextL}>
+                     {wlIndicator.text}
+                   </ThemedText>
+                 </View>
+              )}
+            </View>
           </View>
         </TouchableOpacity>
       );
     }
     return (
       <TouchableOpacity onPress={() => handlePressMatchItem(item)} activeOpacity={item.match ? 0.7 : 1}>
-        <ThemedView 
+        <ThemedView
           style={[
             styles.dailyMatchItemContainer,
             item.Status === "Neutro" && styles.neutralBorder,
             item.Status === "Rojo" && styles.redBorder,
-            item.Status === "Naranja" && styles.orangeBorder 
-          ]} 
+            item.Status === "Naranja" && styles.orangeBorder,
+            item.Status === "Verde" && styles.greenBorder
+          ]}
           lightColor="#f9f9f9" darkColor="#2C2C2E">
           <View style={styles.matchHeaderRow}>
               <View style={styles.matchHeaderTeamInfo}>
@@ -394,9 +440,17 @@ export default function MatchesScreen() {
                   </ThemedText>
               </View>
 
-              {item.lugar && ['H', 'A', 'N'].includes(item.lugar) && (
-                  <ThemedText style={styles.locationTextDaily}>{item.lugar}</ThemedText>
-              )}
+              <View style={styles.locationAndWLContainer}>
+                {item.lugar && ['H', 'A', 'N'].includes(item.lugar) && (
+                    <ThemedText style={styles.locationTextDaily}>{item.lugar}</ThemedText>
+                )}
+                {/* W/L Indicator for regular items */}
+                {wlIndicator && item.lugar && ['H','A'].includes(item.lugar) ? (
+                    <View style={[styles.wlIndicatorCircle, wlIndicator.styleKey === 'W' ? styles.wlIndicatorWBackground : styles.wlIndicatorLBackground]}>
+                      <ThemedText style={wlIndicator.styleKey === 'W' ? styles.wlIndicatorTextW : styles.wlIndicatorTextL}>{wlIndicator.text}</ThemedText>
+                    </View>
+                  ) : null}
+              </View>
           </View>
         </ThemedView>
       </TouchableOpacity>
@@ -427,7 +481,7 @@ export default function MatchesScreen() {
               renderItem={renderDailyMatchItem}
               keyExtractor={(item, index) => `${item.Team}-${item.fecha}-${item.equipoContrario}-${item.Competicion}-${index}`}
               style={styles.dailyMatchesFlatList}
-              contentContainerStyle={{ paddingBottom: 10 }} 
+              contentContainerStyle={{ paddingBottom: 10 }}
             />
           ) : (
             <ThemedText style={styles.noMatchesForDateText}>
@@ -492,18 +546,6 @@ export default function MatchesScreen() {
           </View>
         </View>
       </Modal>
-
-      {/* Botón Flotante de Refresco REMOVED */}
-      {/* 
-      <TouchableOpacity
-        style={[styles.floatingRefreshButton, isLoading && styles.floatingButtonDisabled]}
-        onPress={handleRefreshAllTacticalStatuses}
-        disabled={isLoading}
-      >
-        <IconSymbol name="arrow.clockwise" size={24} color="white" />
-      </TouchableOpacity> 
-      */}
-
     </ThemedView>
   );
 }
@@ -522,7 +564,7 @@ const styles = StyleSheet.create({
   dailyMatchesSection: {
     width: '95%',
     alignSelf: 'center',
-    marginTop: 90, 
+    marginTop: 90,
     marginBottom: 10,
   },
   dateNavigationContainer: {
@@ -533,19 +575,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 5,
     marginBottom: 5,
   },
-  navTextButton: { 
+  navTextButton: {
     padding: 10,
   },
-  navButtonText: { 
+  navButtonText: {
     fontSize: 16,
-    color: Colors.light.tint, 
+    color: Colors.light.tint,
   },
   selectedDateText: {
     fontSize: 16,
     fontWeight: '600',
   },
   dailyMatchesFlatList: {
-    maxHeight: Platform.OS === 'ios' ? 350 : 320, 
+    maxHeight: Platform.OS === 'ios' ? 350 : 320,
     width: '100%',
   },
   noMatchesForDateText: {
@@ -555,19 +597,19 @@ const styles = StyleSheet.create({
     opacity: 0.7,
   },
   dailyJsonToggleContainer: {
-    marginTop: 10, 
+    marginTop: 10,
     marginBottom: 5,
     alignItems: 'center',
   },
   dailyJsonScrollView: {
-    maxHeight: 150, 
+    maxHeight: 150,
     width: '100%',
     borderWidth: 1,
     borderRadius: 5,
     padding: 8,
     marginTop: 5,
   },
-  dailyMatchItemContainer: { 
+  dailyMatchItemContainer: {
     padding: 10,
     marginVertical: 4,
     marginHorizontal: 2,
@@ -584,22 +626,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 8,
   },
-  matchHeaderTeamInfo: { 
+  matchHeaderTeamInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    flexShrink: 1, 
-    marginRight: 5, 
+    flexShrink: 1,
+    marginRight: 5,
   },
   headerTeamEmblem: {
-    width: 18, 
+    width: 18,
     height: 18,
     resizeMode: 'contain',
     marginRight: 6,
   },
-  matchTeamNameHeaderText: { 
+  matchTeamNameHeaderText: {
     fontSize: 13,
     fontWeight: 'bold',
-    flexShrink: 1, 
+    flexShrink: 1,
     opacity: 0.8,
   },
   matchRondaText: {
@@ -613,16 +655,16 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 8,
   },
-  dailyMatchLeftAndMiddleContainer: { 
-    flex: 1, 
+  dailyMatchLeftAndMiddleContainer: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    marginRight: 8, 
+    marginRight: 8,
   },
   dailyMatchDateTimeContainer: {
     flexDirection: 'column',
     alignItems: 'center',
-    minWidth: 55, 
+    minWidth: 55,
   },
   dailyMatchDateSmall: {
     fontSize: 11,
@@ -633,19 +675,19 @@ const styles = StyleSheet.create({
     opacity: 0.8,
   },
   dailyMatchVerticalSeparator: {
-    height: '60%', 
+    height: '60%',
     width: 1,
-    marginHorizontal: 8, 
+    marginHorizontal: 8,
     opacity: 0.3,
   },
   dailyMatchOpponentEmblem: {
     width: 20,
     height: 20,
     resizeMode: 'contain',
-    marginRight: 8, 
+    marginRight: 8,
   },
   dailyMatchOpponentName: {
-    flex: 1, 
+    flex: 1,
     fontSize: 13,
     fontWeight: '600',
     flexShrink: 1,
@@ -656,43 +698,73 @@ const styles = StyleSheet.create({
     opacity: 0.7,
   },
   statusHighlightItem: {
+    paddingVertical: 10, 
+    minHeight: 60, 
     justifyContent: 'center',
     alignItems: 'center',
-    height: 60, 
   },
   championItem: { backgroundColor: 'red' },
   postScudettoItem: { backgroundColor: 'darkred' },
-  negativoItem: { backgroundColor: '#8B0000' }, 
-  internationalBreakItem: { backgroundColor: '#4682B4' }, 
+  negativoItem: { backgroundColor: '#8B0000' },
+  internationalBreakItem: { backgroundColor: '#4682B4' },
+  statusHighlightContent: { 
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   statusHighlightText: {
     color: 'white',
     fontSize: 16,
     fontWeight: 'bold',
     textAlign: 'center',
   },
-  neutralBorder: { 
+  locationAndWLContainer: { 
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  neutralBorder: {
     borderColor: 'white',
     borderWidth: 1,
   },
-  redBorder: { 
+  redBorder: {
     borderColor: 'red',
     borderWidth: 1,
   },
-  orangeBorder: { 
+  orangeBorder: {
     borderColor: 'orange',
     borderWidth: 1,
   },
+  greenBorder: {
+    borderColor: '#34C759', 
+    borderWidth: 1,
+  },
+  wlIndicatorCircle: { 
+    width: 22, 
+    height: 22, 
+    borderRadius: 11, 
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 6, 
+  },
+  wlIndicatorWBackground: { 
+    backgroundColor: 'grey',
+  },
+  wlIndicatorLBackground: { 
+    backgroundColor: '#D3D3D3', // Light grey fill for L
+  },
+  wlIndicatorTextW: { color: 'white', fontSize: 12, fontWeight: 'bold', lineHeight: 22, textAlign: 'center' }, 
+  wlIndicatorTextL: { fontSize: 12, fontWeight: 'bold', lineHeight: 22, textAlign: 'center' }, 
   content: {
     justifyContent: 'center',
     alignItems: 'center',
     width: '100%',
-    paddingVertical: 10, 
+    paddingVertical: 10,
   },
   loader: {
     marginTop: 20,
   },
   infoText: {
-    marginTop: 10, 
+    marginTop: 10,
     textAlign: 'center',
     marginBottom: 10,
     paddingHorizontal: 20,
@@ -720,14 +792,13 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     textAlign: 'center',
   },
-  jsonScrollView: { 
+  jsonScrollView: {
     width: '100%',
     marginBottom: 20,
     maxHeight: '70%',
   },
-  jsonText: { 
+  jsonText: {
     fontSize: 13,
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
   },
-  // floatingRefreshButton and floatingButtonDisabled styles removed
 });
