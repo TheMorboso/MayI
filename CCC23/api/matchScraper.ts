@@ -63,20 +63,23 @@ export async function scrapeMatchDetails(
       const fecha = row.find('td:nth-child(2) > a').text().trim() || row.find('td:nth-child(2)').text().trim() || null;
       let hora = row.find('td:nth-child(3)').text().trim() || null;
 
-      // Ajustar la hora restando 6 horas
+      // Adjust time by subtracting 6 hours
       if (hora && hora.includes(':')) {
         const timeParts = hora.split(':');
         if (timeParts.length === 2) {
           let hours = parseInt(timeParts[0], 10);
           const minutes = parseInt(timeParts[1], 10);
 
-          if (!isNaN(hours) && !isNaN(minutes)) {
+          if (!isNaN(hours) && !isNaN(minutes)) { // Check if parsing was successful
             hours -= 6;
             if (hours < 0) {
-              hours += 24; // Ajustar para el día anterior si es necesario
+              hours += 24; // Adjust for previous day if necessary
             }
             hora = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
           }
+        } else {
+          // If time format is not HH:MM, keep original or set to null
+          // hora = null; // Or keep as is: hora = row.find('td:nth-child(3)').text().trim() || null;
         }
       }
 

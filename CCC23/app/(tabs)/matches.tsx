@@ -389,7 +389,7 @@ export default function MatchesScreen() {
             <View style={styles.statusHighlightContent}>
               <ThemedText style={styles.statusHighlightText}>{text}</ThemedText>
               {/* W/L Indicator for special status items - only if canShowWL was true before this block */}
-              {wlIndicator && item.lugar && ['H', 'A'].includes(item.lugar) && canShowWL && (
+              {wlIndicator && item.lugar && ['H', 'A'].includes(item.lugar) && canShowWL && item.Status !== 'Champion' && (
                  <View style={[styles.wlIndicatorCircle, wlIndicator.styleKey === 'W' ? styles.wlIndicatorWBackground : styles.wlIndicatorLBackground]}>
                    <ThemedText style={wlIndicator.styleKey === 'W' ? styles.wlIndicatorTextW : styles.wlIndicatorTextL}>
                      {wlIndicator.text}
