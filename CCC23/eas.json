@@ -1,8 +1,7 @@
 {
   "cli": {
     "version": ">= 16.10.1",
-    "appVersionSource": "remote",
-         "requireCommit": true
+    "appVersionSource": "remote"
   },
   "build": {
     "development": {
@@ -11,14 +10,14 @@
     },
     "preview": {
       "distribution": "internal",
-       
-      "android": {}
+      "android": {
+        "projectRoot": "."
+      }
     },
     "production": {
       "autoIncrement": true
     }
   },
-  
   "submit": {
     "production": {}
   }
