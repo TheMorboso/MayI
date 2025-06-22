@@ -60,11 +60,11 @@ export async function scrapeMatchDetails(
         const baseSiteUrl = new URL(fullUrl).origin;
         week = new URL(week, baseSiteUrl).href;
       }
-      const fecha = row.find('td:nth-child(2) > a').text().trim() || row.find('td:nth-child(2)').text().trim() || null;
+      let fecha = row.find('td:nth-child(2) > a').text().trim() || row.find('td:nth-child(2)').text().trim() || null;
       let hora = row.find('td:nth-child(3)').text().trim() || null;
 
-      // Adjust time by subtracting 6 hours
-      if (hora && hora.includes(':')) {
+      // Adjust time by subtracting 6 hours and update date if necessary
+      if (hora && hora.includes(':') && fecha) {
         const timeParts = hora.split(':');
         if (timeParts.length === 2) {
           let hours = parseInt(timeParts[0], 10);
@@ -73,7 +73,25 @@ export async function scrapeMatchDetails(
           if (!isNaN(hours) && !isNaN(minutes)) { // Check if parsing was successful
             hours -= 6;
             if (hours < 0) {
-              hours += 24; // Adjust for previous day if necessary
+              hours += 24; // Adjust for previous day
+
+              // Also adjust date to previous day
+              const dateParts = fecha.split('/');
+              if (dateParts.length === 3) {
+                const day = parseInt(dateParts[0], 10);
+                const month = parseInt(dateParts[1], 10) - 1; // JS months are 0-indexed
+                const year = parseInt(dateParts[2], 10);
+                if (!isNaN(day) && !isNaN(month) && !isNaN(year)) {
+                  const matchDate = new Date(Date.UTC(year, month, day));
+                  matchDate.setUTCDate(matchDate.getUTCDate() - 1);
+                  
+                  const prevDay = String(matchDate.getUTCDate()).padStart(2, '0');
+                  const prevMonth = String(matchDate.getUTCMonth() + 1).padStart(2, '0');
+                  const prevYear = matchDate.getUTCFullYear();
+                  
+                  fecha = `${prevDay}/${prevMonth}/${prevYear}`;
+                }
+              }
             }
             hora = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
           }
