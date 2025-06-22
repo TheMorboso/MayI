@@ -1,4 +1,3 @@
-// c/Users/Mauri/Desktop/CCC23/MayI/CCC23/app/(tabs)/matches.tsx
 import React, { useState, useEffect, useCallback } from 'react';
 import { StyleSheet, View, Button, Platform, ActivityIndicator, Alert, ScrollView, Modal, TouchableOpacity, FlatList, Image } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -23,6 +22,7 @@ export default function MatchesScreen() {
   const [matchesData, setMatchesData] = useState<MatchDetails[] | null>(null);
   const [organizedData, setOrganizedData] = useState<OrganizedMatchInfo[] | null>(null);
   const [postScudettoData, setPostScudettoData] = useState<PostScudettoMatchInfo[] | null | undefined>(undefined);
+  const [showGoToTeamsButton, setShowGoToTeamsButton] = useState(false);
   const router = useRouter();
   const navigation = useNavigation();
   const colorScheme = useColorScheme();
@@ -168,6 +168,7 @@ export default function MatchesScreen() {
 
   const handleFetchMatchDetails = async () => {
     setIsLoading(true);
+    setShowGoToTeamsButton(false);
     setMatchesData(null);
     setOrganizedData(null);
 
@@ -186,13 +187,13 @@ export default function MatchesScreen() {
     try {
       const teamsJson = await AsyncStorage.getItem(TEAMS_STORAGE_KEY);
       if (!teamsJson) {
-        Alert.alert('Error', 'No hay equipos guardados para obtener la URL.');
+        setShowGoToTeamsButton(true);
         setIsLoading(false);
         return;
       }
       const savedTeams: ScrapedTeamInfo[] = JSON.parse(teamsJson);
       if (savedTeams.length === 0) {
-        Alert.alert('Información', 'No hay equipos guardados para scrapear.');
+        setShowGoToTeamsButton(true);
         setIsLoading(false);
         return;
       }
@@ -461,91 +462,108 @@ export default function MatchesScreen() {
     <ThemedView style={styles.container}>
       <ThemedText type="title" style={styles.screenTitle}>Matches</ThemedText>
 
-      {(!isLoading && postScudettoData && postScudettoData.length > 0) && (
-        <View style={styles.dailyMatchesSection}>
-          <View style={styles.dateNavigationContainer}>
-            <TouchableOpacity onPress={handlePreviousDay} style={styles.navTextButton} disabled={isLoading}>
-              <ThemedText style={styles.navButtonText}>Back</ThemedText>
-            </TouchableOpacity>
-            <ThemedText style={styles.selectedDateText}>{dateToDDMMYYYY(selectedDate)}</ThemedText>
-            <TouchableOpacity onPress={handleNextDay} style={styles.navTextButton} disabled={isLoading}>
-              <ThemedText style={styles.navButtonText}>Next</ThemedText>
-            </TouchableOpacity>
-          </View>
-
-          {isLoading && (!postScudettoData || postScudettoData.length === 0) ? (
-            <ActivityIndicator size="small" style={{ marginVertical: 20 }}/>
-          ) : filteredDailyMatches.length > 0 ? (
-            <FlatList
-              data={filteredDailyMatches}
-              renderItem={renderDailyMatchItem}
-              keyExtractor={(item, index) => `${item.Team}-${item.fecha}-${item.equipoContrario}-${item.Competicion}-${index}`}
-              style={styles.dailyMatchesFlatList}
-              contentContainerStyle={{ paddingBottom: 10 }}
-            />
-          ) : (
-            <ThemedText style={styles.noMatchesForDateText}>
-              No hay partidos programados para el {dateToDDMMYYYY(selectedDate)}.
-            </ThemedText>
-          )}
-
-          <View style={styles.dailyJsonToggleContainer}>
-            <Button
-              title={isDailyJsonScrollViewVisible ? "Ocultar JSON del Día" : "Mostrar JSON del Día"}
-              onPress={() => setIsDailyJsonScrollViewVisible(!isDailyJsonScrollViewVisible)}
-              color={Platform.OS === 'ios' ? Colors.light.tint : undefined}
-              disabled={isLoading && (!postScudettoData || postScudettoData.length === 0)}
-            />
-          </View>
-
-          {isDailyJsonScrollViewVisible && (
-            <ScrollView style={[styles.dailyJsonScrollView, { borderColor: Colors[colorScheme ?? 'light'].icon }]}>
-              <ThemedText style={styles.jsonText}>
-                {dailyMatchesJson || (isLoading && (!postScudettoData || postScudettoData.length === 0) ? "Cargando..." : "Selecciona una fecha o no hay datos.")}
-              </ThemedText>
-            </ScrollView>
-          )}
-        </View>
-      )}
-
-      <View style={styles.content}>
-        {isLoading && <ActivityIndicator size="large" style={styles.loader} />}
-        {!isLoading && matchesData && (
-          <ThemedText style={styles.infoText} numberOfLines={3} ellipsizeMode="tail">
-            {matchesData.some(match => match.error)
-              ? `Se encontraron errores durante el scrapeo.`
-              : matchesData.length > 0
-                ? postScudettoData && postScudettoData.length > 0
-                  ? `Se obtuvieron, organizaron y procesaron (Post Scudetto) ${postScudettoData.length} partidos.`
-                  : organizedData
-                    ? `Se obtuvieron y organizaron ${organizedData.length} partidos. Procesando Post Scudetto...`
-                    : `Se obtuvieron ${matchesData.length} partidos. Error en organización o sin datos para organizar.`
-              : `No se encontraron partidos.`
-            }
+      {showGoToTeamsButton ? (
+        <View style={styles.centeredContent}>
+          <ThemedText style={styles.noTeamsText}>No hay equipos para mostrar partidos</ThemedText>
+          <ThemedText style={styles.noTeamsSubText}>
+            Por favor, agrega equipos en la pestaña correspondiente para comenzar.
           </ThemedText>
-        )}
-      </View>
-
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={isPostScudettoJsonModalVisible}
-        onRequestClose={() => setIsPostScudettoJsonModalVisible(false)}
-      >
-        <View style={styles.centeredView}>
-          <View style={[styles.modalView, { backgroundColor: colorScheme === 'dark' ? Colors.dark.background : Colors.light.background }]}>
-            <ThemedText type="subtitle" style={styles.modalTitle} numberOfLines={1} ellipsizeMode="tail">
-              JSON de Partidos (Post Scudetto)
-            </ThemedText>
-            <ScrollView style={styles.jsonScrollView}>
-              <ThemedText style={styles.jsonText}>
-                {postScudettoData ? JSON.stringify(postScudettoData, null, 2) : "Datos no disponibles."}
-              </ThemedText>
-            </ScrollView>
-            <Button title="Cerrar" onPress={() => setIsPostScudettoJsonModalVisible(false)} color={Platform.OS === 'ios' ? Colors.light.tint : undefined} />
-          </View>
+          <TouchableOpacity
+            style={styles.goToTeamsButton}
+            onPress={() => router.push('/(tabs)/teams')}
+          >
+            <ThemedText style={styles.goToTeamsButtonText}>Ir a Equipos</ThemedText>
+          </TouchableOpacity>
         </View>
-      </Modal>
+      ) : (
+        <>
+          {(!isLoading && postScudettoData && postScudettoData.length > 0) && (
+            <View style={styles.dailyMatchesSection}>
+              <View style={styles.dateNavigationContainer}>
+                <TouchableOpacity onPress={handlePreviousDay} style={styles.navTextButton} disabled={isLoading}>
+                  <ThemedText style={styles.navButtonText}>Back</ThemedText>
+                </TouchableOpacity>
+                <ThemedText style={styles.selectedDateText}>{dateToDDMMYYYY(selectedDate)}</ThemedText>
+                <TouchableOpacity onPress={handleNextDay} style={styles.navTextButton} disabled={isLoading}>
+                  <ThemedText style={styles.navButtonText}>Next</ThemedText>
+                </TouchableOpacity>
+              </View>
+
+              {isLoading && (!postScudettoData || postScudettoData.length === 0) ? (
+                <ActivityIndicator size="small" style={{ marginVertical: 20 }}/>
+              ) : filteredDailyMatches.length > 0 ? (
+                <FlatList
+                  data={filteredDailyMatches}
+                  renderItem={renderDailyMatchItem}
+                  keyExtractor={(item, index) => `${item.Team}-${item.fecha}-${item.equipoContrario}-${item.Competicion}-${index}`}
+                  style={styles.dailyMatchesFlatList}
+                  contentContainerStyle={{ paddingBottom: 10 }}
+                />
+              ) : (
+                <ThemedText style={styles.noMatchesForDateText}>
+                  No hay partidos programados para el {dateToDDMMYYYY(selectedDate)}.
+                </ThemedText>
+              )}
+
+              <View style={styles.dailyJsonToggleContainer}>
+                <Button
+                  title={isDailyJsonScrollViewVisible ? "Ocultar JSON del Día" : "Mostrar JSON del Día"}
+                  onPress={() => setIsDailyJsonScrollViewVisible(!isDailyJsonScrollViewVisible)}
+                  color={Platform.OS === 'ios' ? Colors.light.tint : undefined}
+                  disabled={isLoading && (!postScudettoData || postScudettoData.length === 0)}
+                />
+              </View>
+
+              {isDailyJsonScrollViewVisible && (
+                <ScrollView style={[styles.dailyJsonScrollView, { borderColor: Colors[colorScheme ?? 'light'].icon }]}>
+                  <ThemedText style={styles.jsonText}>
+                    {dailyMatchesJson || (isLoading && (!postScudettoData || postScudettoData.length === 0) ? "Cargando..." : "Selecciona una fecha o no hay datos.")}
+                  </ThemedText>
+                </ScrollView>
+              )}
+            </View>
+          )}
+
+          <View style={styles.content}>
+            {isLoading && <ActivityIndicator size="large" style={styles.loader} />}
+            {!isLoading && matchesData && (
+              <ThemedText style={styles.infoText} numberOfLines={3} ellipsizeMode="tail">
+                {matchesData.some(match => match.error)
+                  ? `Se encontraron errores durante el scrapeo.`
+                  : matchesData.length > 0
+                    ? postScudettoData && postScudettoData.length > 0
+                      ? `Se obtuvieron, organizaron y procesaron (Post Scudetto) ${postScudettoData.length} partidos.`
+                      : organizedData
+                        ? `Se obtuvieron y organizaron ${organizedData.length} partidos. Procesando Post Scudetto...`
+                        : `Se obtuvieron ${matchesData.length} partidos. Error en organización o sin datos para organizar.`
+                  : `No se encontraron partidos.`
+                }
+              </ThemedText>
+            )}
+          </View>
+
+          <Modal
+            animationType="slide"
+            transparent={true}
+            visible={isPostScudettoJsonModalVisible}
+            onRequestClose={() => setIsPostScudettoJsonModalVisible(false)}
+          >
+            <View style={styles.centeredView}>
+              <View style={[styles.modalView, { backgroundColor: colorScheme === 'dark' ? Colors.dark.background : Colors.light.background }]}>
+                <ThemedText type="subtitle" style={styles.modalTitle} numberOfLines={1} ellipsizeMode="tail">
+                  JSON de Partidos (Post Scudetto)
+                </ThemedText>
+                <ScrollView style={styles.jsonScrollView}>
+                  <ThemedText style={styles.jsonText}>
+                    {postScudettoData ? JSON.stringify(postScudettoData, null, 2) : "Datos no disponibles."}
+                  </ThemedText>
+                </ScrollView>
+                <Button title="Cerrar" onPress={() => setIsPostScudettoJsonModalVisible(false)} color={Platform.OS === 'ios' ? Colors.light.tint : undefined} />
+              </View>
+            </View>
+          </Modal>
+        </>
+      )}
     </ThemedView>
   );
 }
@@ -553,6 +571,39 @@ export default function MatchesScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  centeredContent: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+  },
+  noTeamsText: {
+    fontSize: 18,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  noTeamsSubText: {
+    textAlign: 'center',
+    opacity: 0.7,
+    marginBottom: 20,
+  },
+  goToTeamsButton: {
+    backgroundColor: Colors.light.tint,
+    paddingVertical: 12,
+    paddingHorizontal: 30,
+    borderRadius: 8,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+  },
+  goToTeamsButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
   screenTitle: {
     position: 'absolute',
