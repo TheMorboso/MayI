@@ -22,7 +22,7 @@ interface FormationSlot {
 
 type FormationLayout = FormationSlot[];
 
-const FORMATIONS_ARRAY = ["4-2-3-1", "4-4-2", "4-3-3", "3-4-2-1", "3-5-2", "4-3-1-2"] as const;
+const FORMATIONS_ARRAY = ["4-2-3-1", "4-4-2", "4-3-3", "3-4-2-1", "3-5-2", "4-3-1-2", "4-1-4-1"] as const;
 type FormationType = typeof FORMATIONS_ARRAY[number];
 
 const ACTUAL_PLAYER_POSITIONS = [
@@ -80,7 +80,8 @@ const FORMATION_DEFINITIONS: Record<FormationType, FormationLayout> = {
     { id: 'lcm', label: 'MC', line: 'MID', topRatio: 0.5, leftRatio: 0.37 },
     { id: 'lm', label: 'LI', line: 'MID', topRatio: 0.5, leftRatio: 0.12 },
     { id: 'ram', label: 'MCO', line: 'FWD', topRatio: 0.28, leftRatio: 0.65 },
-    { id: 'lam', label: 'MCO', line: 'FWD', topRatio: 0.28, leftRatio: 0.35 },
+    // El siguiente slot acepta MCO/EI/ED
+    { id: 'lam', label: 'MCO/EI/ED', line: 'FWD', topRatio: 0.28, leftRatio: 0.35 },
     { id: 'st', label: 'DC', line: 'FWD', topRatio: 0.15, leftRatio: 0.5 },
   ],
   "3-5-2": [
@@ -108,6 +109,21 @@ const FORMATION_DEFINITIONS: Record<FormationType, FormationLayout> = {
     { id: 'cam', label: 'MCO', line: 'MID', topRatio: 0.35, leftRatio: 0.5 },
     { id: 'rs', label: 'DC', line: 'FWD', topRatio: 0.18, leftRatio: 0.6 },
     { id: 'ls', label: 'DC', line: 'FWD', topRatio: 0.18, leftRatio: 0.4 },
+  ],
+  "4-1-4-1": [
+    { id: 'gk', label: 'POR', line: 'GK', topRatio: 0.92, leftRatio: 0.5 },
+    { id: 'rb', label: 'LD', line: 'DEF', topRatio: 0.75, leftRatio: 0.88 },
+    { id: 'rcb', label: 'DFC', line: 'DEF', topRatio: 0.75, leftRatio: 0.63 },
+    { id: 'lcb', label: 'DFC', line: 'DEF', topRatio: 0.75, leftRatio: 0.37 },
+    { id: 'lb', label: 'LI', line: 'DEF', topRatio: 0.75, leftRatio: 0.12 },
+    { id: 'cdm', label: 'PIV', line: 'MID', topRatio: 0.62, leftRatio: 0.5 },
+    // Línea de 4 mediapuntas bien alineada
+    { id: 'rw', label: 'ED', line: 'MID', topRatio: 0.44, leftRatio: 0.85 },
+    { id: 'cam', label: 'MCO', line: 'MID', topRatio: 0.44, leftRatio: 0.65 },
+    { id: 'ram', label: 'ED/EI', line: 'MID', topRatio: 0.44, leftRatio: 0.35 },
+    { id: 'lw', label: 'EI', line: 'MID', topRatio: 0.44, leftRatio: 0.15 },
+    // DC más adelantado y centrado
+    { id: 'st', label: 'DC', line: 'FWD', topRatio: 0.22, leftRatio: 0.5 },
   ],
 };
 
@@ -373,9 +389,23 @@ export default function MatchAnalysisScreen() {
     for (const slot of currentFormationLayout) {
       const playerInSlot = lineup[slot.id];
       if (playerInSlot) {
-        if (!playerInSlot.assignedPositions || playerInSlot.assignedPositions.length === 0 ||
-            !playerInSlot.assignedPositions.includes(slot.label as ActualPlayerPositionType)) {
+        if (!playerInSlot.assignedPositions || playerInSlot.assignedPositions.length === 0) {
           return false;
+        }
+        if (slot.label === 'MCO/EI/ED') {
+          const validPositions = ['MCO', 'EI', 'ED'];
+          if (!playerInSlot.assignedPositions.some(pos => validPositions.includes(pos))) {
+            return false;
+          }
+        } else if (slot.label === 'ED/EI') {
+          const validPositions = ['ED', 'EI'];
+          if (!playerInSlot.assignedPositions.some(pos => validPositions.includes(pos))) {
+            return false;
+          }
+        } else {
+          if (!playerInSlot.assignedPositions.includes(slot.label as ActualPlayerPositionType)) {
+            return false;
+          }
         }
       }
     }
@@ -662,6 +692,16 @@ export default function MatchAnalysisScreen() {
         hasPlacedPlayers = true;
         if (!playerInSlot.assignedPositions || playerInSlot.assignedPositions.length === 0) {
           hasMisplacedPlayer = true;
+        } else if (slot.label === 'MCO/EI/ED') {
+          const validPositions = ['MCO', 'EI', 'ED'];
+          if (!playerInSlot.assignedPositions.some(pos => validPositions.includes(pos))) {
+            hasMisplacedPlayer = true;
+          }
+        } else if (slot.label === 'ED/EI') {
+          const validPositions = ['ED', 'EI'];
+          if (!playerInSlot.assignedPositions.some(pos => validPositions.includes(pos))) {
+            hasMisplacedPlayer = true;
+          }
         } else {
           const isPlayerInCorrectPosition = playerInSlot.assignedPositions.includes(slot.label as ActualPlayerPositionType);
           if (!isPlayerInCorrectPosition) {
@@ -1173,7 +1213,11 @@ export default function MatchAnalysisScreen() {
           if (playerInSlot) {
             textContent = formatPlayerNameForField(playerInSlot.name) || playerInSlot.number || slot.label;
             if (!playerInSlot.assignedPositions || playerInSlot.assignedPositions.length === 0 ||
-                !playerInSlot.assignedPositions.includes(slot.label as ActualPlayerPositionType)) {
+                (slot.label === 'MCO/EI/ED'
+                  ? !playerInSlot.assignedPositions.some(pos => ['MCO', 'EI', 'ED'].includes(pos))
+                  : slot.label === 'ED/EI'
+                    ? !playerInSlot.assignedPositions.some(pos => ['ED', 'EI'].includes(pos))
+                    : !playerInSlot.assignedPositions.includes(slot.label as ActualPlayerPositionType))) {
               currentSlotBackgroundColor = outOfPositionColor;
             }
           } else {
@@ -1225,6 +1269,8 @@ export default function MatchAnalysisScreen() {
         {error && !isLoading && (
           <ThemedView style={styles.centeredError}><ThemedText style={styles.errorText}>{error}</ThemedText></ThemedView>
         )}
+
+
 
         <ThemedView style={styles.tacticalSchemeContainer} lightColor="#e0e0e0" darkColor="#1c1c1e" onLayout={onFieldLayout}>
           {isLoading && !analysisData && homeTeamActualTier === undefined ? (

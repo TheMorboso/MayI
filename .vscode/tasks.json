@@ -1,0 +1,14 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"type": "shell",
+			"label": "Assemble APK (Release)",
+			"command": "cd android && ./gradlew assembleRelease",
+			"group": "build",
+			"problemMatcher": [
+				"$javac"
+			]
+		}
+	]
+}

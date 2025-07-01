@@ -21,7 +21,7 @@ const PLAYERS_GLOBAL_CACHE_KEY = 'playersGlobalCache';
 const TACTICAL_LINEUPS_CACHE_KEY = 'tacticalLineupsCache';
 const LLUVIA_STATUS_CACHE_KEY = 'lluviaStatusCache';
 
-const COACH_TACTICAL_SCHEMES = ["4-2-3-1", "4-4-2", "3-4-2-1", "4-3-3", "3-5-2", "4-3-1-2", "No Definido"] as const;
+const COACH_TACTICAL_SCHEMES = ["4-2-3-1", "4-4-2", "3-4-2-1", "4-3-3", "3-5-2", "4-3-1-2", "4-1-4-1", "No Definido"] as const;
 type CoachTacticalSchemeType = typeof COACH_TACTICAL_SCHEMES[number];
 const DEFAULT_SCHEME_PLACEHOLDER: CoachTacticalSchemeType = "No Definido";
 
@@ -38,16 +38,31 @@ interface FormationSlot {
   leftRatio: number;
 }
 type FormationLayout = FormationSlot[];
-const FORMATIONS_ARRAY_FOR_REFRESH = ["4-2-3-1", "4-4-2", "4-3-3", "3-4-2-1", "3-5-2", "4-3-1-2"] as const;
+const FORMATIONS_ARRAY_FOR_REFRESH = ["4-2-3-1", "4-4-2", "4-3-3", "3-4-2-1", "3-5-2", "4-3-1-2", "4-1-4-1"] as const;
 type FormationType = typeof FORMATIONS_ARRAY_FOR_REFRESH[number];
 
 const FORMATION_DEFINITIONS_FOR_REFRESH: Record<FormationType, FormationLayout> = {
   "4-4-2": [ { id: 'gk', label: 'POR', line: 'GK', topRatio: 0.92, leftRatio: 0.5 },{ id: 'rb', label: 'LD', line: 'DEF', topRatio: 0.75, leftRatio: 0.88 },{ id: 'rcb', label: 'DFC', line: 'DEF', topRatio: 0.75, leftRatio: 0.63 },{ id: 'lcb', label: 'DFC', line: 'DEF', topRatio: 0.75, leftRatio: 0.37 },{ id: 'lb', label: 'LI', line: 'DEF', topRatio: 0.75, leftRatio: 0.12 },{ id: 'rm', label: 'MD', line: 'MID', topRatio: 0.5, leftRatio: 0.88 },{ id: 'rcm', label: 'MC', line: 'MID', topRatio: 0.5, leftRatio: 0.63 },{ id: 'lcm', label: 'MC', line: 'MID', topRatio: 0.5, leftRatio: 0.37 },{ id: 'lm', label: 'MI', line: 'MID', topRatio: 0.5, leftRatio: 0.12 },{ id: 'rs', label: 'DC', line: 'FWD', topRatio: 0.22, leftRatio: 0.6 },{ id: 'ls', label: 'DC', line: 'FWD', topRatio: 0.22, leftRatio: 0.4 },  ],
   "4-2-3-1": [ { id: 'gk', label: 'POR', line: 'GK', topRatio: 0.92, leftRatio: 0.5 },{ id: 'rb', label: 'LD', line: 'DEF', topRatio: 0.75, leftRatio: 0.88 },{ id: 'rcb', label: 'DFC', line: 'DEF', topRatio: 0.75, leftRatio: 0.63 },{ id: 'lcb', label: 'DFC', line: 'DEF', topRatio: 0.75, leftRatio: 0.37 },{ id: 'lb', label: 'LI', line: 'DEF', topRatio: 0.75, leftRatio: 0.12 },{ id: 'rdm', label: 'MC', line: 'MID', topRatio: 0.58, leftRatio: 0.63 },{ id: 'ldm', label: 'MC', line: 'MID', topRatio: 0.58, leftRatio: 0.37 },{ id: 'ram', label: 'ED', line: 'MID', topRatio: 0.38, leftRatio: 0.85 },{ id: 'cam', label: 'MCO', line: 'MID', topRatio: 0.38, leftRatio: 0.5 },{ id: 'lam', label: 'EI', line: 'MID', topRatio: 0.38, leftRatio: 0.15 },{ id: 'st', label: 'DC', line: 'FWD', topRatio: 0.15, leftRatio: 0.5 },  ],
   "4-3-3": [ { id: 'gk', label: 'POR', line: 'GK', topRatio: 0.92, leftRatio: 0.5 },{ id: 'rb', label: 'LD', line: 'DEF', topRatio: 0.75, leftRatio: 0.88 },{ id: 'rcb', label: 'DFC', line: 'DEF', topRatio: 0.75, leftRatio: 0.63 },{ id: 'lcb', label: 'DFC', line: 'DEF', topRatio: 0.75, leftRatio: 0.37 },{ id: 'lb', label: 'LI', line: 'DEF', topRatio: 0.75, leftRatio: 0.12 },{ id: 'rcm', label: 'MC', line: 'MID', topRatio: 0.5, leftRatio: 0.78 },{ id: 'cm', label: 'PIV', line: 'MID', topRatio: 0.5, leftRatio: 0.5 },{ id: 'lcm', label: 'MC', line: 'MID', topRatio: 0.5, leftRatio: 0.22 },{ id: 'rw', label: 'ED', line: 'FWD', topRatio: 0.22, leftRatio: 0.88 },{ id: 'st', label: 'DC', line: 'FWD', topRatio: 0.22, leftRatio: 0.5 },{ id: 'lw', label: 'EI', line: 'FWD', topRatio: 0.22, leftRatio: 0.12 },  ],
-  "3-4-2-1": [ { id: 'gk', label: 'POR', line: 'GK', topRatio: 0.92, leftRatio: 0.5 },{ id: 'rcb', label: 'DFC', line: 'DEF', topRatio: 0.75, leftRatio: 0.75 },{ id: 'cb', label: 'DFC', line: 'DEF', topRatio: 0.75, leftRatio: 0.5 },{ id: 'lcb', label: 'DFC', line: 'DEF', topRatio: 0.75, leftRatio: 0.25 },{ id: 'rm', label: 'LD', line: 'MID', topRatio: 0.5, leftRatio: 0.88 },{ id: 'rcm', label: 'MC', line: 'MID', topRatio: 0.5, leftRatio: 0.63 },{ id: 'lcm', label: 'MC', line: 'MID', topRatio: 0.5, leftRatio: 0.37 },{ id: 'lm', label: 'LI', line: 'MID', topRatio: 0.5, leftRatio: 0.12 },{ id: 'ram', label: 'MCO', line: 'FWD', topRatio: 0.28, leftRatio: 0.65 },{ id: 'lam', label: 'MCO', line: 'FWD', topRatio: 0.28, leftRatio: 0.35 },{ id: 'st', label: 'DC', line: 'FWD', topRatio: 0.15, leftRatio: 0.5 },  ],
+  "3-4-2-1": [ { id: 'gk', label: 'POR', line: 'GK', topRatio: 0.92, leftRatio: 0.5 },{ id: 'rcb', label: 'DFC', line: 'DEF', topRatio: 0.75, leftRatio: 0.75 },{ id: 'cb', label: 'DFC', line: 'DEF', topRatio: 0.75, leftRatio: 0.5 },{ id: 'lcb', label: 'DFC', line: 'DEF', topRatio: 0.75, leftRatio: 0.25 },{ id: 'rm', label: 'LD', line: 'MID', topRatio: 0.5, leftRatio: 0.88 },{ id: 'rcm', label: 'MC', line: 'MID', topRatio: 0.5, leftRatio: 0.63 },{ id: 'lcm', label: 'MC', line: 'MID', topRatio: 0.5, leftRatio: 0.37 },{ id: 'lm', label: 'LI', line: 'MID', topRatio: 0.5, leftRatio: 0.12 },{ id: 'ram', label: 'MCO', line: 'FWD', topRatio: 0.28, leftRatio: 0.65 },{ id: 'lam', label: 'MCO/EI/ED', line: 'FWD', topRatio: 0.28, leftRatio: 0.35 },{ id: 'st', label: 'DC', line: 'FWD', topRatio: 0.15, leftRatio: 0.5 },  ],
   "3-5-2": [ { id: 'gk', label: 'POR', line: 'GK', topRatio: 0.92, leftRatio: 0.5 },{ id: 'rcb', label: 'DFC', line: 'DEF', topRatio: 0.75, leftRatio: 0.75 },{ id: 'cb', label: 'DFC', line: 'DEF', topRatio: 0.75, leftRatio: 0.5 },{ id: 'lcb', label: 'DFC', line: 'DEF', topRatio: 0.75, leftRatio: 0.25 },{ id: 'rwb', label: 'LD', line: 'MID', topRatio: 0.55, leftRatio: 0.9 },{ id: 'rcm', label: 'MC', line: 'MID', topRatio: 0.5, leftRatio: 0.65 },{ id: 'cm', label: 'MC', line: 'MID', topRatio: 0.5, leftRatio: 0.5 },{ id: 'lcm', label: 'MC', line: 'MID', topRatio: 0.5, leftRatio: 0.35 },{ id: 'lwb', label: 'LI', line: 'MID', topRatio: 0.55, leftRatio: 0.1 },{ id: 'rs', label: 'DC', line: 'FWD', topRatio: 0.22, leftRatio: 0.6 },{ id: 'ls', label: 'DC', line: 'FWD', topRatio: 0.22, leftRatio: 0.4 },  ],
   "4-3-1-2": [ { id: 'gk', label: 'POR', line: 'GK', topRatio: 0.92, leftRatio: 0.5 },{ id: 'rb', label: 'LD', line: 'DEF', topRatio: 0.75, leftRatio: 0.88 },{ id: 'rcb', label: 'DFC', line: 'DEF', topRatio: 0.75, leftRatio: 0.63 },{ id: 'lcb', label: 'DFC', line: 'DEF', topRatio: 0.75, leftRatio: 0.37 },{ id: 'lb', label: 'LI', line: 'DEF', topRatio: 0.75, leftRatio: 0.12 },{ id: 'rcm', label: 'MC', line: 'MID', topRatio: 0.55, leftRatio: 0.78 },{ id: 'cm', label: 'MC', line: 'MID', topRatio: 0.55, leftRatio: 0.5 },{ id: 'lcm', label: 'MC', line: 'MID', topRatio: 0.55, leftRatio: 0.22 },{ id: 'cam', label: 'MCO', line: 'MID', topRatio: 0.35, leftRatio: 0.5 },{ id: 'rs', label: 'DC', line: 'FWD', topRatio: 0.18, leftRatio: 0.6 },{ id: 'ls', label: 'DC', line: 'FWD', topRatio: 0.18, leftRatio: 0.4 },  ],
+  "4-1-4-1": [
+    { id: 'gk', label: 'POR', line: 'GK', topRatio: 0.92, leftRatio: 0.5 },
+    { id: 'rb', label: 'LD', line: 'DEF', topRatio: 0.75, leftRatio: 0.88 },
+    { id: 'rcb', label: 'DFC', line: 'DEF', topRatio: 0.75, leftRatio: 0.63 },
+    { id: 'lcb', label: 'DFC', line: 'DEF', topRatio: 0.75, leftRatio: 0.37 },
+    { id: 'lb', label: 'LI', line: 'DEF', topRatio: 0.75, leftRatio: 0.12 },
+    { id: 'cdm', label: 'PIV', line: 'MID', topRatio: 0.62, leftRatio: 0.5 },
+    // Línea de 4 mediapuntas bien alineada
+    { id: 'rw', label: 'ED', line: 'MID', topRatio: 0.44, leftRatio: 0.85 },
+    { id: 'cam', label: 'MCO', line: 'MID', topRatio: 0.44, leftRatio: 0.65 },
+    { id: 'ram', label: 'ED/EI', line: 'MID', topRatio: 0.44, leftRatio: 0.35 },
+    { id: 'lw', label: 'EI', line: 'MID', topRatio: 0.44, leftRatio: 0.15 },
+    // DC más adelantado y centrado
+    { id: 'st', label: 'DC', line: 'FWD', topRatio: 0.22, leftRatio: 0.5 },
+  ],
 };
 
 interface EnrichedPlayerInfoForRefresh extends PlayerInfo {
@@ -131,9 +146,23 @@ export default function TeamMatchesScreen() {
     for (const slot of currentFormationLayout) {
       const playerInSlot = lineup[slot.id];
       if (playerInSlot) {
-        if (!playerInSlot.assignedPositions || playerInSlot.assignedPositions.length === 0 ||
-            !playerInSlot.assignedPositions.includes(slot.label as ActualPlayerPositionType)) {
+        if (!playerInSlot.assignedPositions || playerInSlot.assignedPositions.length === 0) {
           return false;
+        }
+        if (slot.label === 'MCO/EI/ED') {
+          const validPositions = ['MCO', 'EI', 'ED'];
+          if (!playerInSlot.assignedPositions.some(pos => validPositions.includes(pos))) {
+            return false;
+          }
+        } else if (slot.label === 'ED/EI') {
+          const validPositions = ['ED', 'EI'];
+          if (!playerInSlot.assignedPositions.some(pos => validPositions.includes(pos))) {
+            return false;
+          }
+        } else {
+          if (!playerInSlot.assignedPositions.includes(slot.label as ActualPlayerPositionType)) {
+            return false;
+          }
         }
       }
     }
@@ -158,7 +187,16 @@ export default function TeamMatchesScreen() {
         if (!playerInSlot.assignedPositions || playerInSlot.assignedPositions.length === 0) {
           hasMisplacedPlayer = true;
         } else {
-          const isPlayerInCorrectPosition = playerInSlot.assignedPositions.includes(slot.label as ActualPlayerPositionType);
+          let isPlayerInCorrectPosition = false;
+          if (slot.label === 'MCO/EI/ED') {
+            const validPositions = ['MCO', 'EI', 'ED'];
+            isPlayerInCorrectPosition = playerInSlot.assignedPositions.some(pos => validPositions.includes(pos));
+          } else if (slot.label === 'ED/EI') {
+            const validPositions = ['ED', 'EI'];
+            isPlayerInCorrectPosition = playerInSlot.assignedPositions.some(pos => validPositions.includes(pos));
+          } else {
+            isPlayerInCorrectPosition = playerInSlot.assignedPositions.includes(slot.label as ActualPlayerPositionType);
+          }
           if (!isPlayerInCorrectPosition) {
             hasMisplacedPlayer = true;
           }
