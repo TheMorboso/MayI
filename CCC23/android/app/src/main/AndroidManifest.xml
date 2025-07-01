@@ -25,7 +25,6 @@
         <category android:name="android.intent.category.DEFAULT"/>
         <category android:name="android.intent.category.BROWSABLE"/>
         <data android:scheme="ccc23"/>
-        <data android:scheme="exp+ccc23"/>
       </intent-filter>
     </activity>
   </application>
