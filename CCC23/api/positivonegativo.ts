@@ -113,59 +113,12 @@ export function processPositiveNegative(
       }
     }
 
-    // Lógicas para partidos de "Amistoso"
+    // Nueva lógica para partidos "Amistoso":
     if (updatedMatch.Competicion === "Amistoso" && updatedMatch.Team) {
-      // Regla 1: Si el tier del equipo NO es "TierS"
-      if (updatedMatch.tier !== "TierS") {
+      if (updatedMatch.opponentTier === "TierS") {
         updatedMatch.Status = "Negativo";
       }
-
-      // Regla 2: Si el equipo es "RB Leipzig"
-      if (updatedMatch.Team.includes("RB Leipzig")) {
-        updatedMatch.Status = "Negativo";
-      }
-
-      // Regla 3 (NUEVA): Amistoso donde el oponente juega en la misma liga principal que el equipo del amistoso.
-      const opponentName = updatedMatch.equipoContrario; // Ya podría ser "TierA" si la regla de arriba aplicó
-      const mainTeamActualLeague = updatedMatch.teamMainLeague; // Liga principal del equipo del amistoso
-
-      // Si el oponente es "TierA", esta regla no debería aplicar de la misma forma,
-      // ya que "TierA" no es un nombre de equipo real para buscar en `allMatchesArray`.
-      // La lógica original de esta regla buscaba si el `opponentName` (original) jugaba en la misma liga.
-      // Si `opponentName` ahora es "TierA", la búsqueda `anyMatch.Team === "TierA"` no encontrará nada.
-      // Por lo tanto, esta regla se vuelve menos efectiva si el nombre ya fue reemplazado.
-      // Consideraremos si esta regla debe ejecutarse ANTES del reemplazo de nombre o si su lógica debe adaptarse.
-      // Por ahora, la dejamos tal cual, pero su efectividad cambia.
-      if (opponentName && opponentName !== "TierA" && mainTeamActualLeague && savedTeamsFirstNavLinkTexts.includes(mainTeamActualLeague)) {
-        let opponentGamesInMainTeamLeague = 0;
-        for (const anyMatch of allMatchesArray) {
-          if (anyMatch.Competicion === mainTeamActualLeague) {
-            if (anyMatch.Team === opponentName || anyMatch.equipoContrario === opponentName) {
-              opponentGamesInMainTeamLeague++;
-            }
-          }
-        }
-        if (opponentGamesInMainTeamLeague > 0) {
-          updatedMatch.Status = "Negativo";
-        }
-      }
-
-      // Regla 4 (ANTERIOR GENERAL, AHORA AJUSTADA):
-      // Si el oponente no tiene NINGUNA experiencia en CUALQUIER liga principal.
-      // Similar a la Regla 3, si `opponentName` es "TierA", esta regla no funcionará como antes.
-      if (opponentName && opponentName.trim() !== "" && opponentName !== "TierA") {
-        let opponentTotalGamesInAnyMainLeague = 0;
-        for (const otherMatch of allMatchesArray) {
-          if (otherMatch.Competicion && savedTeamsFirstNavLinkTexts.includes(otherMatch.Competicion)) {
-            if (otherMatch.Team === opponentName || otherMatch.equipoContrario === opponentName) {
-              opponentTotalGamesInAnyMainLeague++;
-            }
-          }
-        }
-        if (opponentTotalGamesInAnyMainLeague === 0) {
-          updatedMatch.Status = "Negativo";
-        }
-      }
+      // Si el equipo contrario no es TierS, no modificar el Status
     }
 
     // LÓGICA PARA PARTIDOS DE LIGA POSTERGADOS:
