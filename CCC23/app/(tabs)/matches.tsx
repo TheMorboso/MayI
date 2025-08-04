@@ -8,7 +8,7 @@ import { ThemedText } from '@/components/ThemedText';
 import { ScrapedTeamInfo } from '../../api/scraper';
 import { scrapeMatchDetails, MatchDetails } from '../../api/matchScraper';
 import { applyCorrections } from '../../api/correcciones';
-import { processPostScudettoData, PostScudettoMatchInfo } from '../../api/postscudetto';
+import { PostScudettoMatchInfo } from '../../api/postscudetto';
 import { processPositiveNegative } from '../../api/positivonegativo';
 import { organizeMatchData, OrganizedMatchInfo } from '../../api/organizador';
 // PlayerInfo, ACTUAL_PLAYER_POSITIONS, FORMATION_DEFINITIONS, TacticalFormationType for refresh removed
@@ -253,7 +253,7 @@ export default function MatchesScreen() {
       return;
     }
     try {
-      const finalData = processPostScudettoData(currentOrganizedData, leagueCompetitionNames);
+      const finalData = currentOrganizedData as PostScudettoMatchInfo[];
       const dataAfterPositiveNegative = processPositiveNegative(finalData, leagueCompetitionNames);
       const correctedData = applyCorrections(dataAfterPositiveNegative);
 

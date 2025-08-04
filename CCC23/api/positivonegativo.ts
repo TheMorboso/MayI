@@ -83,35 +83,6 @@ export function processPositiveNegative(
       }
     }
 
-    // NUEVA REGLA: Partido de "Competicion" (Champions/Europa League, etc.) entre dos partidos con Status "Post scudetto"
-    // Esta regla SOLO aplica a equipos TierS.
-    if (updatedMatch.Competicion === "Competicion" && updatedMatch.Team && updatedMatch.tier === "TierS") {
-      // Solo aplicar si el Status actual no es Champion o Post scudetto
-      if (updatedMatch.Status !== "Champion" && updatedMatch.Status !== "Post scudetto") {
-        let prevMatchOfSameTeam: PostScudettoMatchInfo | null = null;
-        // Buscar el partido inmediatamente anterior del mismo equipo
-        for (let i = index - 1; i >= 0; i--) {
-          if (allMatchesArray[i].Team === updatedMatch.Team) {
-            prevMatchOfSameTeam = allMatchesArray[i];
-            break; // Encontramos el partido anterior más reciente del mismo equipo
-          }
-        }
-
-        let nextMatchOfSameTeam: PostScudettoMatchInfo | null = null;
-        // Buscar el partido inmediatamente siguiente del mismo equipo
-        for (let i = index + 1; i < allMatchesArray.length; i++) {
-          if (allMatchesArray[i].Team === updatedMatch.Team) {
-            nextMatchOfSameTeam = allMatchesArray[i];
-            break; // Encontramos el partido siguiente más cercano del mismo equipo
-          }
-        }
-
-        if (prevMatchOfSameTeam && prevMatchOfSameTeam.Status === "Post scudetto" &&
-            nextMatchOfSameTeam && nextMatchOfSameTeam.Status === "Post scudetto") {
-          updatedMatch.Status = "Negativo";
-        }
-      }
-    }
 
     // Nueva lógica para partidos "Amistoso":
     if (updatedMatch.Competicion === "Amistoso" && updatedMatch.Team) {
